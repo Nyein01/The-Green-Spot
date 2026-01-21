@@ -9,7 +9,9 @@ import {
   Leaf,
   Moon,
   Sun,
-  Database
+  Database,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { SalesForm } from '../components/SalesForm';
 import { InventoryManager } from '../components/InventoryManager';
@@ -40,15 +42,30 @@ const App: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [hasLocalData, setHasLocalData] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // Load initial data and setup Cloud Sync Listeners
   useEffect(() => {
+    // Monitor online status
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     // Check local storage for theme preference
     const savedTheme = localStorage.getItem('greentrack_theme');
     if (savedTheme === 'dark') {
       setIsDarkMode(true);
     } else if (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setIsDarkMode(true);
+    }
+
+    // Check for legacy local data
+    const localSales = localStorage.getItem('greentrack_sales');
+    const localInv = localStorage.getItem('greentrack_inventory');
+    if ((localSales && localSales !== '[]') || (localInv && localInv !== '[]')) {
+      setHasLocalData(true);
     }
 
     // Subscribe to Firestore (Real-time updates)
@@ -67,6 +84,8 @@ const App: React.FC = () => {
     return () => {
       unsubscribeSales();
       unsubscribeInventory();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
@@ -77,6 +96,10 @@ const App: React.FC = () => {
   };
 
   const handleNewSale = async (sale: SaleItem) => {
+    if (!isOnline) {
+      alert("⚠️ You are offline. Sales cannot be saved to the cloud right now.");
+      return;
+    }
     // 1. Add Sale to Cloud
     const success = await addSaleToCloud(sale);
     
@@ -112,9 +135,15 @@ const App: React.FC = () => {
   };
 
   const handleMigrate = async () => {
-    if(confirm("This will upload your local storage data to the cloud database. Continue?")) {
+    if(confirm("This will upload your OLD offline data to the cloud. \n\nNote: The data you currently see on screen is already in the cloud. This button is only for recovering data from before the cloud update.")) {
         const result = await migrateLocalToCloud();
         alert(result);
+        // Re-check logic to hide button if migrated or empty
+        const localSales = localStorage.getItem('greentrack_sales');
+        const localInv = localStorage.getItem('greentrack_inventory');
+        if ((!localSales || localSales === '[]') && (!localInv || localInv === '[]')) {
+            setHasLocalData(false);
+        }
     }
   };
 
@@ -184,22 +213,30 @@ const App: React.FC = () => {
           <div className="max-w-md mx-auto bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm pb-20 md:pb-6 dark:border dark:border-gray-700">
             <h2 className="text-xl font-bold mb-6 dark:text-white">Cloud Settings</h2>
             <div className="space-y-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-                <div className="flex items-center text-blue-800 dark:text-blue-300 mb-2 font-bold">
-                    <Cloud className="w-5 h-5 mr-2" />
-                    Cloud Status: Connected
+              <div className={`p-4 rounded-lg border ${isOnline ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800' : 'bg-orange-50 dark:bg-orange-900/20 border-orange-100 dark:border-orange-800'}`}>
+                <div className={`flex items-center mb-2 font-bold ${isOnline ? 'text-blue-800 dark:text-blue-300' : 'text-orange-800 dark:text-orange-300'}`}>
+                    {isOnline ? <Cloud className="w-5 h-5 mr-2" /> : <WifiOff className="w-5 h-5 mr-2" />}
+                    Status: {isOnline ? 'Connected' : 'Offline'}
                 </div>
-                <p className="text-xs text-blue-600 dark:text-blue-400">
-                    Project ID: green-spot-41030
-                    <br/>
-                    Your data is safely stored in Google Cloud. Changes made here will instantly appear on other devices.
+                <p className={`text-xs ${isOnline ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                    {isOnline 
+                      ? "Your data is safely stored in Google Cloud. Changes appear instantly on other devices."
+                      : "You are currently offline. Please reconnect to save new sales."}
                 </p>
               </div>
 
-              <button onClick={handleMigrate} className="w-full flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200">
-                <Database className="w-5 h-5 mr-3" />
-                Upload Local Data to Cloud
-              </button>
+              {hasLocalData && (
+                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-100 dark:border-yellow-800">
+                  <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-400 mb-2">Legacy Data Detected</h4>
+                  <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-3">
+                    We found data from the old offline version of the app on this device.
+                  </p>
+                  <button onClick={handleMigrate} className="w-full flex items-center justify-center p-3 bg-white dark:bg-gray-800 rounded border border-yellow-300 dark:border-yellow-700 text-yellow-800 dark:text-yellow-400 font-medium hover:bg-yellow-100 dark:hover:bg-gray-700">
+                    <Database className="w-4 h-4 mr-2" />
+                    Recover & Upload Old Data
+                  </button>
+                </div>
+              )}
               
               {inventory.length === 0 && (
                 <button onClick={handleSeed} className="w-full flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200">

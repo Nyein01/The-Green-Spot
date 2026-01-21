@@ -127,11 +127,11 @@ export const migrateLocalToCloud = async () => {
       await batch.commit();
       return `Successfully migrated ${count} items to cloud!`;
     }
-    return "No local data found to migrate.";
+    return "No legacy offline data found on this device. Your recent data is already in the Cloud.";
 
   } catch (e) {
     console.error("Migration failed", e);
-    return "Migration failed. Check console.";
+    return "Migration failed. Check console for details.";
   }
 };
 
