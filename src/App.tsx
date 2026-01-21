@@ -52,11 +52,14 @@ const App: React.FC = () => {
     }
 
     // Subscribe to Firestore (Real-time updates)
+    console.log("Subscribing to Firestore...");
     const unsubscribeSales = subscribeToSales((data) => {
+      console.log("Sales data updated:", data.length);
       setSales(data);
     });
 
     const unsubscribeInventory = subscribeToInventory((data) => {
+      console.log("Inventory data updated:", data.length);
       setInventory(data);
       setLoading(false);
     });
@@ -75,7 +78,12 @@ const App: React.FC = () => {
 
   const handleNewSale = async (sale: SaleItem) => {
     // 1. Add Sale to Cloud
-    await addSaleToCloud(sale);
+    const success = await addSaleToCloud(sale);
+    
+    if (!success) {
+      alert("⚠️ Error saving sale to cloud. Check your internet connection.");
+      return;
+    }
     
     // 2. Adjust Inventory in Cloud
     if (sale.productType !== 'Other') {
@@ -182,6 +190,8 @@ const App: React.FC = () => {
                     Cloud Status: Connected
                 </div>
                 <p className="text-xs text-blue-600 dark:text-blue-400">
+                    Project ID: green-spot-41030
+                    <br/>
                     Your data is safely stored in Google Cloud. Changes made here will instantly appear on other devices.
                 </p>
               </div>

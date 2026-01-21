@@ -28,6 +28,8 @@ export const subscribeToSales = (callback: (sales: SaleItem[]) => void) => {
       salesData.push(doc.data() as SaleItem);
     });
     callback(salesData);
+  }, (error) => {
+    console.error("Error subscribing to sales:", error);
   });
 };
 
@@ -41,6 +43,8 @@ export const subscribeToInventory = (callback: (inventory: InventoryItem[]) => v
       inventoryData.push(doc.data() as InventoryItem);
     });
     callback(inventoryData);
+  }, (error) => {
+    console.error("Error subscribing to inventory:", error);
   });
 };
 
