@@ -1,7 +1,8 @@
 // @ts-ignore
 import { initializeApp } from "firebase/app";
-// @ts-ignore
 import { getFirestore } from "firebase/firestore";
+// @ts-ignore
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBNbaGjHax-W4T8nvQ22J1PhL8ttu9xGpQ",
@@ -16,7 +17,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-console.log("Firebase initialized for project:", firebaseConfig.projectId);
 
 // Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app);
+export const auth = getAuth(app);

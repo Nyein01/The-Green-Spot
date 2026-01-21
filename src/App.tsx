@@ -13,9 +13,9 @@ import {
   Wifi,
   WifiOff
 } from 'lucide-react';
-import { SalesForm } from '../components/SalesForm';
-import { InventoryManager } from '../components/InventoryManager';
-import { DailyReport } from '../components/DailyReport';
+import { SalesForm } from './components/SalesForm';
+import { InventoryManager } from './components/InventoryManager';
+import { DailyReport } from './components/DailyReport';
 import { 
   subscribeToSales, 
   subscribeToInventory,
@@ -45,14 +45,8 @@ const App: React.FC = () => {
   const [hasLocalData, setHasLocalData] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Load initial data and setup Cloud Sync Listeners
+  // Data Sync
   useEffect(() => {
-    // Monitor online status
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
     // Check local storage for theme preference
     const savedTheme = localStorage.getItem('greentrack_theme');
     if (savedTheme === 'dark') {
@@ -60,6 +54,12 @@ const App: React.FC = () => {
     } else if (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setIsDarkMode(true);
     }
+    
+    // Monitor online status
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
     // Check for legacy local data
     const localSales = localStorage.getItem('greentrack_sales');
@@ -69,14 +69,11 @@ const App: React.FC = () => {
     }
 
     // Subscribe to Firestore (Real-time updates)
-    console.log("Subscribing to Firestore...");
     const unsubscribeSales = subscribeToSales((data) => {
-      console.log("Sales data updated:", data.length);
       setSales(data);
     });
 
     const unsubscribeInventory = subscribeToInventory((data) => {
-      console.log("Inventory data updated:", data.length);
       setInventory(data);
       setLoading(false);
     });
@@ -212,6 +209,7 @@ const App: React.FC = () => {
         return (
           <div className="max-w-md mx-auto bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm pb-20 md:pb-6 dark:border dark:border-gray-700">
             <h2 className="text-xl font-bold mb-6 dark:text-white">Cloud Settings</h2>
+            
             <div className="space-y-4">
               <div className={`p-4 rounded-lg border ${isOnline ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800' : 'bg-orange-50 dark:bg-orange-900/20 border-orange-100 dark:border-orange-800'}`}>
                 <div className={`flex items-center mb-2 font-bold ${isOnline ? 'text-blue-800 dark:text-blue-300' : 'text-orange-800 dark:text-orange-300'}`}>
