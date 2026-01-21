@@ -1,5 +1,6 @@
 import { SaleItem, InventoryItem, ProductType } from '../../types';
 import { db } from '../firebaseConfig';
+// @ts-ignore
 import { 
   collection, 
   doc, 
@@ -30,6 +31,12 @@ export const subscribeToSales = (callback: (sales: SaleItem[]) => void) => {
     callback(salesData);
   }, (error) => {
     console.error("Error subscribing to sales:", error);
+    // @ts-ignore
+    if (error.code === 'permission-denied') {
+        alert("DATABASE ERROR: Permission Denied.\n\nPlease go to Firebase Console > Firestore > Rules and set 'allow read, write: if true;'");
+    } else {
+        alert("DATABASE CONNECTION ERROR: Check your internet or console logs.");
+    }
   });
 };
 
@@ -45,6 +52,10 @@ export const subscribeToInventory = (callback: (inventory: InventoryItem[]) => v
     callback(inventoryData);
   }, (error) => {
     console.error("Error subscribing to inventory:", error);
+    // @ts-ignore
+    if (error.code === 'permission-denied') {
+        alert("DATABASE PERMISSION ERROR (Inventory):\n\nPlease go to Firebase Console > Firestore > Rules and change 'allow read, write: if false;' to 'allow read, write: if true;'");
+    }
   });
 };
 
