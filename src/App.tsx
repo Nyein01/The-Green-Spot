@@ -11,9 +11,9 @@ import {
   Sun,
   Database
 } from 'lucide-react';
-import { SalesForm } from './components/SalesForm';
-import { InventoryManager } from './components/InventoryManager';
-import { DailyReport } from './components/DailyReport';
+import { SalesForm } from '../components/SalesForm';
+import { InventoryManager } from '../components/InventoryManager';
+import { DailyReport } from '../components/DailyReport';
 import { 
   subscribeToSales, 
   subscribeToInventory,
@@ -24,7 +24,7 @@ import {
   migrateLocalToCloud,
   seedDefaultInventory
 } from './services/storageService';
-import { SaleItem, InventoryItem } from './types';
+import { SaleItem, InventoryItem } from '../types';
 
 enum Tab {
   SALES = 'Sales',

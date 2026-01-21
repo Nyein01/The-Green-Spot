@@ -1,4 +1,4 @@
-import { SaleItem, InventoryItem, ProductType } from '../types';
+import { SaleItem, InventoryItem, ProductType } from '../../types';
 import { db } from '../firebaseConfig';
 import { 
   collection, 
