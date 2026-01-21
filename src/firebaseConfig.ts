@@ -1,14 +1,16 @@
+// @ts-ignore
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDRcReY37C7Ab0cjdUv638i34CSebnmokw",
-  authDomain: "the-green-spot-a1f66.firebaseapp.com",
-  projectId: "the-green-spot-a1f66",
-  storageBucket: "the-green-spot-a1f66.firebasestorage.app",
-  messagingSenderId: "741956597265",
-  appId: "1:741956597265:web:31ef1f65405a5c609f23b0",
-  measurementId: "G-D8D9VX0BSQ"
+  apiKey: "AIzaSyBNbaGjHax-W4T8nvQ22J1PhL8ttu9xGpQ",
+  authDomain: "green-spot-41030.firebaseapp.com",
+  databaseURL: "https://green-spot-41030-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "green-spot-41030",
+  storageBucket: "green-spot-41030.firebasestorage.app",
+  messagingSenderId: "602147765172",
+  appId: "1:602147765172:web:c09fa24a0f32f953f890e1",
+  measurementId: "G-S2KMW3583Y"
 };
 
 // Initialize Firebase
