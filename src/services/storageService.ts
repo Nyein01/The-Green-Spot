@@ -13,9 +13,20 @@ import {
   writeBatch
 } from "firebase/firestore";
 
-// Collection Names
-const SALES_COLLECTION = 'sales';
-const INVENTORY_COLLECTION = 'inventory';
+// Helper to determine collection names based on shop ID
+const getCollections = (shopId: string) => {
+  if (shopId === 'nearcannabis') {
+    return {
+      sales: 'sales_nc',
+      inventory: 'inventory_nc'
+    };
+  }
+  // Default to original collections for The Green Spot to preserve existing data
+  return {
+    sales: 'sales',
+    inventory: 'inventory'
+  };
+};
 
 // Helper to sanitize objects for Firestore (removes undefined values)
 const sanitize = <T>(obj: T): T => {
@@ -25,9 +36,10 @@ const sanitize = <T>(obj: T): T => {
 // --- REAL-TIME SUBSCRIPTIONS ---
 
 // Listen to Sales updates
-export const subscribeToSales = (callback: (sales: SaleItem[]) => void) => {
+export const subscribeToSales = (shopId: string, callback: (sales: SaleItem[]) => void) => {
+  const { sales } = getCollections(shopId);
   // Query sales ordered by timestamp descending (newest first)
-  const q = query(collection(db, SALES_COLLECTION), orderBy("timestamp", "desc"));
+  const q = query(collection(db, sales), orderBy("timestamp", "desc"));
   
   return onSnapshot(q, (snapshot) => {
     const salesData: SaleItem[] = [];
@@ -47,8 +59,9 @@ export const subscribeToSales = (callback: (sales: SaleItem[]) => void) => {
 };
 
 // Listen to Inventory updates
-export const subscribeToInventory = (callback: (inventory: InventoryItem[]) => void) => {
-  const q = query(collection(db, INVENTORY_COLLECTION));
+export const subscribeToInventory = (shopId: string, callback: (inventory: InventoryItem[]) => void) => {
+  const { inventory } = getCollections(shopId);
+  const q = query(collection(db, inventory));
   
   return onSnapshot(q, (snapshot) => {
     const inventoryData: InventoryItem[] = [];
@@ -67,9 +80,10 @@ export const subscribeToInventory = (callback: (inventory: InventoryItem[]) => v
 
 // --- ACTIONS ---
 
-export const addSaleToCloud = async (sale: SaleItem) => {
+export const addSaleToCloud = async (shopId: string, sale: SaleItem) => {
+  const { sales } = getCollections(shopId);
   try {
-    await setDoc(doc(db, SALES_COLLECTION, sale.id), sanitize(sale));
+    await setDoc(doc(db, sales, sale.id), sanitize(sale));
     return true;
   } catch (e: any) {
     console.error("Error adding sale: ", e);
@@ -78,9 +92,10 @@ export const addSaleToCloud = async (sale: SaleItem) => {
   }
 };
 
-export const deleteSaleFromCloud = async (saleId: string) => {
+export const deleteSaleFromCloud = async (shopId: string, saleId: string) => {
+  const { sales } = getCollections(shopId);
   try {
-    await deleteDoc(doc(db, SALES_COLLECTION, saleId));
+    await deleteDoc(doc(db, sales, saleId));
     return true;
   } catch (e: any) {
     console.error("Error deleting sale: ", e);
@@ -89,9 +104,10 @@ export const deleteSaleFromCloud = async (saleId: string) => {
   }
 };
 
-export const updateInventoryInCloud = async (item: InventoryItem) => {
+export const updateInventoryInCloud = async (shopId: string, item: InventoryItem) => {
+  const { inventory } = getCollections(shopId);
   try {
-    await setDoc(doc(db, INVENTORY_COLLECTION, item.id), sanitize(item));
+    await setDoc(doc(db, inventory, item.id), sanitize(item));
     return true;
   } catch (e: any) {
     console.error("Error updating inventory: ", e);
@@ -100,9 +116,10 @@ export const updateInventoryInCloud = async (item: InventoryItem) => {
   }
 };
 
-export const adjustStockInCloud = async (itemId: string, currentStock: number, adjustment: number) => {
+export const adjustStockInCloud = async (shopId: string, itemId: string, currentStock: number, adjustment: number) => {
+  const { inventory } = getCollections(shopId);
   try {
-    const itemRef = doc(db, INVENTORY_COLLECTION, itemId);
+    const itemRef = doc(db, inventory, itemId);
     await updateDoc(itemRef, {
       stockLevel: currentStock + adjustment,
       lastUpdated: Date.now()
@@ -110,37 +127,38 @@ export const adjustStockInCloud = async (itemId: string, currentStock: number, a
     return true;
   } catch (e: any) {
     console.error("Error adjusting stock: ", e);
-    // Don't alert on stock adjust for smoother UI, just log
     return false;
   }
 };
 
-export const deleteInventoryItemFromCloud = async (itemId: string) => {
+export const deleteInventoryItemFromCloud = async (shopId: string, itemId: string) => {
+  const { inventory } = getCollections(shopId);
   try {
-    await deleteDoc(doc(db, INVENTORY_COLLECTION, itemId));
+    await deleteDoc(doc(db, inventory, itemId));
     return true;
   } catch (e: any) {
     console.error("Error deleting inventory item: ", e);
-    alert(`Failed to delete item from database.\nError: ${e.message}\n\nCheck your internet or Firebase Rules.`);
+    alert(`Failed to delete item from database.\nError: ${e.message}`);
     return false;
   }
 };
 
-export const clearSalesInCloud = async (sales: SaleItem[]) => {
-  if (sales.length === 0) return true;
+export const clearSalesInCloud = async (shopId: string, salesList: SaleItem[]) => {
+  if (salesList.length === 0) return true;
+  const { sales } = getCollections(shopId);
 
   const CHUNK_SIZE = 400;
   const chunks = [];
   
-  for (let i = 0; i < sales.length; i += CHUNK_SIZE) {
-    chunks.push(sales.slice(i, i + CHUNK_SIZE));
+  for (let i = 0; i < salesList.length; i += CHUNK_SIZE) {
+    chunks.push(salesList.slice(i, i + CHUNK_SIZE));
   }
 
   try {
     for (const chunk of chunks) {
         const batch = writeBatch(db);
         chunk.forEach((sale) => {
-            const ref = doc(db, SALES_COLLECTION, sale.id);
+            const ref = doc(db, sales, sale.id);
             batch.delete(ref);
         });
         await batch.commit();
@@ -154,11 +172,15 @@ export const clearSalesInCloud = async (sales: SaleItem[]) => {
 };
 
 // --- MIGRATION TOOL (LocalStorage -> Firestore) ---
-
+// Note: Migration only supports the default shop (Green Spot) for now as legacy data belongs there.
 export const migrateLocalToCloud = async () => {
   try {
     const localSales = localStorage.getItem('greentrack_sales');
     const localInv = localStorage.getItem('greentrack_inventory');
+    
+    // Default collections
+    const SALES_COLLECTION = 'sales';
+    const INVENTORY_COLLECTION = 'inventory';
     
     const batch = writeBatch(db);
     let count = 0;
@@ -185,7 +207,7 @@ export const migrateLocalToCloud = async () => {
       await batch.commit();
       return `Successfully migrated ${count} items to cloud!`;
     }
-    return "No legacy offline data found on this device. Your recent data is already in the Cloud.";
+    return "No legacy offline data found on this device.";
 
   } catch (e) {
     console.error("Migration failed", e);
@@ -193,7 +215,8 @@ export const migrateLocalToCloud = async () => {
   }
 };
 
-export const seedDefaultInventory = async () => {
+export const seedDefaultInventory = async (shopId: string) => {
+    const { inventory } = getCollections(shopId);
     const defaultInventory: InventoryItem[] = [
       { id: '1', category: ProductType.FLOWER, name: 'Sour Diesel', grade: 'Mid' as any, stockLevel: 100, lastUpdated: Date.now() },
       { id: '2', category: ProductType.FLOWER, name: 'Blue Dream', grade: 'Top' as any, stockLevel: 50, lastUpdated: Date.now() },
@@ -201,7 +224,7 @@ export const seedDefaultInventory = async () => {
     
     const batch = writeBatch(db);
     defaultInventory.forEach(item => {
-        batch.set(doc(db, INVENTORY_COLLECTION, item.id), sanitize(item));
+        batch.set(doc(db, inventory, item.id), sanitize(item));
     });
     await batch.commit();
 }

@@ -11,8 +11,11 @@ import {
   Sun,
   Database,
   Wifi,
-  WifiOff
+  WifiOff,
+  Store,
+  LogOut
 } from 'lucide-react';
+import { LoginForm } from './components/LoginForm';
 import { SalesForm } from './components/SalesForm';
 import { InventoryManager } from './components/InventoryManager';
 import { DailyReport } from './components/DailyReport';
@@ -37,8 +40,15 @@ enum Tab {
   SETTINGS = 'Settings'
 }
 
+type ShopId = 'greenspot' | 'nearcannabis';
+
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  
   const [activeTab, setActiveTab] = useState<Tab>(Tab.SALES);
+  const [currentShop, setCurrentShop] = useState<ShopId>('greenspot');
+  
   const [sales, setSales] = useState<SaleItem[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -50,8 +60,17 @@ const App: React.FC = () => {
   // Animation state for deletions
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
+  // Shop display names
+  const shopNames = {
+    greenspot: "The Green Spot",
+    nearcannabis: "Near Cannabis"
+  };
+
   // Data Sync
   useEffect(() => {
+    if (!isAuthenticated) return;
+
+    setLoading(true);
     // Check local storage for theme preference
     const savedTheme = localStorage.getItem('greentrack_theme');
     if (savedTheme === 'dark') {
@@ -66,19 +85,19 @@ const App: React.FC = () => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Check for legacy local data
+    // Check for legacy local data (only relevant for greenspot usually)
     const localSales = localStorage.getItem('greentrack_sales');
     const localInv = localStorage.getItem('greentrack_inventory');
     if ((localSales && localSales !== '[]') || (localInv && localInv !== '[]')) {
       setHasLocalData(true);
     }
 
-    // Subscribe to Firestore (Real-time updates)
-    const unsubscribeSales = subscribeToSales((data) => {
+    // Subscribe to Firestore (Real-time updates) with Shop ID
+    const unsubscribeSales = subscribeToSales(currentShop, (data) => {
       setSales(data);
     });
 
-    const unsubscribeInventory = subscribeToInventory((data) => {
+    const unsubscribeInventory = subscribeToInventory(currentShop, (data) => {
       setInventory(data);
       setLoading(false);
     });
@@ -89,7 +108,7 @@ const App: React.FC = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [currentShop, isAuthenticated]); // Re-run when shop changes or auth changes
 
   const toggleDarkMode = () => {
     const newMode = !isDarkMode;
@@ -103,7 +122,7 @@ const App: React.FC = () => {
       return;
     }
     // 1. Add Sale to Cloud
-    const success = await addSaleToCloud(sale);
+    const success = await addSaleToCloud(currentShop, sale);
     
     if (!success) {
       alert("⚠️ Error saving sale to cloud. Check your internet connection.");
@@ -113,7 +132,7 @@ const App: React.FC = () => {
     // 2. Adjust Inventory in Cloud (Matches by name now for all types)
     const item = inventory.find(i => i.name === sale.productName);
     if (item) {
-        await adjustStockInCloud(item.id, item.stockLevel, -sale.quantity);
+        await adjustStockInCloud(currentShop, item.id, item.stockLevel, -sale.quantity);
     }
   };
 
@@ -131,12 +150,12 @@ const App: React.FC = () => {
     // Delay actual delete to allow animation to play
     setTimeout(async () => {
         // 1. Delete sale
-        await deleteSaleFromCloud(sale.id);
+        await deleteSaleFromCloud(currentShop, sale.id);
 
         // 2. Restore Stock
         const item = inventory.find(i => i.name === sale.productName);
         if (item) {
-             await adjustStockInCloud(item.id, item.stockLevel, sale.quantity); // Add back
+             await adjustStockInCloud(currentShop, item.id, item.stockLevel, sale.quantity); // Add back
         }
         
         // Remove from deleting set (item will be gone from sales array anyway)
@@ -149,21 +168,25 @@ const App: React.FC = () => {
   };
 
   const handleUpdateInventory = async (item: InventoryItem) => {
-    await updateInventoryInCloud(item);
+    await updateInventoryInCloud(currentShop, item);
   };
 
   const handleAdjustStock = async (id: string, adjustment: number) => {
     const item = inventory.find(i => i.id === id);
     if(item) {
-        await adjustStockInCloud(id, item.stockLevel, adjustment);
+        await adjustStockInCloud(currentShop, id, item.stockLevel, adjustment);
     }
   };
 
   const handleResetDay = async () => {
-    await clearSalesInCloud(sales);
+    await clearSalesInCloud(currentShop, sales);
   };
 
   const handleMigrate = async () => {
+    if (currentShop !== 'greenspot') {
+        alert("Legacy data migration is only available for 'The Green Spot' shop.");
+        return;
+    }
     if(confirm("This will upload your OLD offline data to the cloud. \n\nNote: The data you currently see on screen is already in the cloud. This button is only for recovering data from before the cloud update.")) {
         const result = await migrateLocalToCloud();
         alert(result);
@@ -176,8 +199,26 @@ const App: React.FC = () => {
   };
 
   const handleSeed = async () => {
-    await seedDefaultInventory();
-    alert("Default inventory added!");
+    await seedDefaultInventory(currentShop);
+    alert(`Default inventory added to ${shopNames[currentShop]}!`);
+  }
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setSales([]);
+    setInventory([]);
+    // Reset to default
+    setCurrentShop('greenspot');
+    setIsSuperAdmin(false);
+  }
+
+  // --- Auth Guard ---
+  if (!isAuthenticated) {
+      return <LoginForm onLogin={(shopId, isAdmin) => {
+          setCurrentShop(shopId);
+          setIsSuperAdmin(isAdmin);
+          setIsAuthenticated(true);
+      }} />;
   }
 
   const renderContent = () => {
@@ -185,7 +226,7 @@ const App: React.FC = () => {
         return (
             <div className="flex h-full items-center justify-center text-green-600">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-                <span className="ml-3 font-medium">Syncing with Cloud...</span>
+                <span className="ml-3 font-medium">Loading {shopNames[currentShop]}...</span>
             </div>
         );
     }
@@ -239,6 +280,7 @@ const App: React.FC = () => {
               onReset={handleResetDay}
               onDeleteSale={handleDeleteSale}
               deletingIds={deletingIds}
+              shopName={shopNames[currentShop]}
             />
           </div>
         );
@@ -260,7 +302,7 @@ const App: React.FC = () => {
                 </p>
               </div>
 
-              {hasLocalData && (
+              {hasLocalData && currentShop === 'greenspot' && (
                 <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-100 dark:border-yellow-800">
                   <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-400 mb-2">Legacy Data Detected</h4>
                   <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-3">
@@ -276,7 +318,7 @@ const App: React.FC = () => {
               {inventory.length === 0 && (
                 <button onClick={handleSeed} className="w-full flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200">
                     <Package className="w-5 h-5 mr-3" />
-                    Load Default Inventory
+                    Load Default Inventory for {shopNames[currentShop]}
                 </button>
               )}
             </div>
@@ -294,7 +336,7 @@ const App: React.FC = () => {
         <div className="md:hidden bg-white dark:bg-gray-800 p-4 shadow-sm flex justify-between items-center z-20 flex-shrink-0 relative border-b dark:border-gray-700">
           <div className="flex items-center">
             <Leaf className="w-6 h-6 text-green-600 mr-2" />
-            <span className="font-bold text-green-700 dark:text-green-500 text-lg">The Green Spot</span>
+            <span className="font-bold text-green-700 dark:text-green-500 text-lg">{shopNames[currentShop]}</span>
           </div>
           <button 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -316,12 +358,32 @@ const App: React.FC = () => {
               <div className="flex items-center mb-2">
                 <Leaf className="w-8 h-8 text-green-600 mr-2" />
                 <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-green-400 leading-tight">
-                  The Green Spot
+                  {shopNames[currentShop]}
                 </h1>
               </div>
               <p className="text-xs text-gray-400 dark:text-gray-500 pl-1">POS & Inventory</p>
             </div>
 
+            {/* Shop Selector - Only shown for Super Admin */}
+            {isSuperAdmin && (
+              <div className="px-4 mb-4">
+                  <div className="relative">
+                      <select 
+                        value={currentShop}
+                        onChange={(e) => setCurrentShop(e.target.value as ShopId)}
+                        className="w-full appearance-none bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 py-2.5 px-4 pr-8 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 cursor-pointer"
+                      >
+                        <option value="greenspot">The Green Spot</option>
+                        <option value="nearcannabis">Near Cannabis</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 dark:text-gray-400">
+                          <Store className="w-4 h-4" />
+                      </div>
+                  </div>
+                  <p className="text-[10px] text-center text-blue-500 mt-2 font-semibold">Admin Mode</p>
+              </div>
+            )}
+            
             {/* Mobile Menu Header inside sidebar */}
             <div className="md:hidden p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
               <span className="font-bold text-xl text-green-700 dark:text-green-500">Menu</span>
@@ -370,9 +432,17 @@ const App: React.FC = () => {
               {isDarkMode ? <Sun className="w-5 h-5 mr-2" /> : <Moon className="w-5 h-5 mr-2" />}
               {isDarkMode ? 'Light Mode' : 'Dark Mode'}
             </button>
+            
+            <button 
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center p-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors font-medium text-sm"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Log Out
+            </button>
 
             <div className="bg-green-900 dark:bg-black/50 rounded-lg p-4 text-white text-center">
-              <p className="text-xs font-semibold opacity-80">Today's Total</p>
+              <p className="text-xs font-semibold opacity-80">Today's Total ({shopNames[currentShop]})</p>
               <p className="text-xl font-bold">{sales.reduce((a, b) => a + b.price, 0).toLocaleString()} ฿</p>
             </div>
           </div>

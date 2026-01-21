@@ -12,9 +12,10 @@ interface DailyReportProps {
   onReset: () => void;
   onDeleteSale: (sale: SaleItem) => void;
   deletingIds: Set<string>;
+  shopName: string;
 }
 
-export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onReset, onDeleteSale, deletingIds }) => {
+export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onReset, onDeleteSale, deletingIds, shopName }) => {
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -88,7 +89,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
         heightLeft -= pdfHeight;
       }
 
-      pdf.save(`TheGreenSpot_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+      pdf.save(`${shopName.replace(/\s+/g, '')}_Report_${new Date().toISOString().split('T')[0]}.pdf`);
 
     } catch (error) {
       console.error("PDF Generation failed", error);
@@ -121,7 +122,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
                <Leaf className="w-8 h-8 text-green-600" />
             </div>
           </div>
-          <h2 className="text-3xl font-extrabold text-gray-800 uppercase tracking-widest mb-1">The Green Spot</h2>
+          <h2 className="text-3xl font-extrabold text-gray-800 uppercase tracking-widest mb-1">{shopName}</h2>
           <p className="text-gray-400 text-[10px] tracking-[0.2em] uppercase">Premium Dispensary System</p>
           <div className="mt-6 border-b border-dashed border-gray-200 pb-4">
              <p className="text-gray-400 text-[10px] uppercase mb-1">Date of Report</p>
