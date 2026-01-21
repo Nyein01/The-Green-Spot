@@ -1,0 +1,319 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  LayoutDashboard, 
+  PlusCircle, 
+  Package, 
+  FileText, 
+  LogOut, 
+  Upload, 
+  Download,
+  Menu,
+  X,
+  Leaf,
+  Moon,
+  Sun
+} from 'lucide-react';
+import { SalesForm } from './components/SalesForm';
+import { InventoryManager } from './components/InventoryManager';
+import { DailyReport } from './components/DailyReport';
+import { 
+  getSales, 
+  saveSale, 
+  clearSales, 
+  getInventory, 
+  updateInventoryItem, 
+  adjustStock,
+  exportData,
+  importData
+} from './services/storageService';
+import { SaleItem, InventoryItem } from './types';
+
+enum Tab {
+  SALES = 'Sales',
+  INVENTORY = 'Inventory',
+  REPORT = 'Report',
+  SETTINGS = 'Settings'
+}
+
+const App: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<Tab>(Tab.SALES);
+  const [sales, setSales] = useState<SaleItem[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Helper to refresh data from storage
+  const refreshData = () => {
+    setSales(getSales());
+    setInventory(getInventory());
+  };
+
+  // Load initial data and setup sync listeners
+  useEffect(() => {
+    refreshData();
+    
+    // Check local storage for theme preference
+    const savedTheme = localStorage.getItem('greentrack_theme');
+    if (savedTheme === 'dark') {
+      setIsDarkMode(true);
+    } else if (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setIsDarkMode(true);
+    }
+
+    // LISTENER 1: Sync data when updated in another tab/window
+    const handleStorageChange = (e: StorageEvent) => {
+      // If the event key is null, it means storage was cleared
+      if (e.key === null || e.key === 'greentrack_sales' || e.key === 'greentrack_inventory') {
+        refreshData();
+      }
+    };
+
+    // LISTENER 2: Refresh data when user switches back to this tab (crucial for mobile)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshData();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  const toggleDarkMode = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    localStorage.setItem('greentrack_theme', newMode ? 'dark' : 'light');
+  };
+
+  const handleNewSale = (sale: SaleItem) => {
+    const updatedSales = saveSale(sale);
+    setSales(updatedSales);
+    
+    // Automatically update local inventory state to reflect the deduction immediately in UI
+    if (sale.productType !== 'Other') {
+       const item = inventory.find(i => i.name === sale.productName);
+       if (item) {
+         handleAdjustStock(item.id, -sale.quantity);
+       }
+    }
+  };
+
+  const handleUpdateInventory = (item: InventoryItem) => {
+    const updated = updateInventoryItem(item);
+    setInventory(updated);
+  };
+
+  const handleAdjustStock = (id: string, amount: number) => {
+    const updated = adjustStock(id, amount);
+    setInventory(updated);
+  };
+
+  const handleResetDay = () => {
+    clearSales();
+    setSales([]);
+  };
+
+  const handleExport = () => {
+    const data = exportData();
+    navigator.clipboard.writeText(data).then(() => {
+      alert("Data copied to clipboard! You can send this to the boss.");
+    });
+  };
+
+  const handleImport = () => {
+    const data = prompt("Paste the data JSON here:");
+    if (data) {
+      if (importData(data)) {
+        refreshData(); // Use the refresh helper
+        alert("Data imported successfully!");
+      } else {
+        alert("Invalid data format.");
+      }
+    }
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case Tab.SALES:
+        return (
+          <div className="max-w-2xl mx-auto pb-20 md:pb-0">
+            <SalesForm 
+              inventory={inventory} 
+              onSaleComplete={handleNewSale} 
+              onStockUpdate={setInventory}
+            />
+            <div className="mt-8">
+              <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4 px-1">Recent Transactions</h3>
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 divide-y dark:divide-gray-700">
+                {sales.length === 0 && <div className="p-4 text-center text-gray-400 dark:text-gray-500">No sales today yet.</div>}
+                {sales.slice(0, 5).map(sale => (
+                  <div key={sale.id} className="p-4 flex justify-between items-center">
+                    <div>
+                      <div className="font-medium text-gray-800 dark:text-gray-200">{sale.productName}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{new Date(sale.timestamp).toLocaleTimeString()} • {sale.quantity} units</div>
+                    </div>
+                    <div className="font-bold text-green-600 dark:text-green-400">+{sale.price} ฿</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      case Tab.INVENTORY:
+        return (
+          <div className="pb-20 md:pb-0">
+            <InventoryManager 
+              inventory={inventory} 
+              onUpdateInventory={handleUpdateInventory}
+              onAdjustStock={handleAdjustStock}
+            />
+          </div>
+        );
+      case Tab.REPORT:
+        return (
+          <div className="pb-20 md:pb-0">
+            <DailyReport 
+              sales={sales} 
+              inventory={inventory}
+              onReset={handleResetDay}
+            />
+          </div>
+        );
+      case Tab.SETTINGS:
+        return (
+          <div className="max-w-md mx-auto bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm pb-20 md:pb-6 dark:border dark:border-gray-700">
+            <h2 className="text-xl font-bold mb-6 dark:text-white">Data Management</h2>
+            <div className="space-y-4">
+              <button onClick={handleExport} className="w-full flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200">
+                <Upload className="w-5 h-5 mr-3" />
+                Export / Copy Data
+              </button>
+              <button onClick={handleImport} className="w-full flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200">
+                <Download className="w-5 h-5 mr-3" />
+                Import / Paste Data
+              </button>
+              <div className="pt-4 text-xs text-gray-400 dark:text-gray-500 text-center">
+                Use these tools to sync data between devices manually since we are running in a serverless environment.
+              </div>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className={`${isDarkMode ? 'dark' : ''}`}>
+      <div className="h-screen w-full bg-gray-100 dark:bg-gray-900 flex flex-col md:flex-row overflow-hidden transition-colors duration-200">
+        {/* Mobile Header */}
+        <div className="md:hidden bg-white dark:bg-gray-800 p-4 shadow-sm flex justify-between items-center z-20 flex-shrink-0 relative border-b dark:border-gray-700">
+          <div className="flex items-center">
+            <Leaf className="w-6 h-6 text-green-600 mr-2" />
+            <span className="font-bold text-green-700 dark:text-green-500 text-lg">The Green Spot</span>
+          </div>
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 -mr-2 text-gray-600 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-gray-700 rounded-full transition-colors"
+          >
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+        </div>
+
+        {/* Sidebar Navigation (Desktop) & Mobile Menu */}
+        <nav className={`
+          fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:relative md:translate-x-0 transition-transform duration-300 cubic-bezier(0.4, 0, 0.2, 1)
+          w-72 bg-white dark:bg-gray-800 shadow-2xl md:shadow-lg z-50 flex flex-col justify-between
+          border-r dark:border-gray-700
+        `}>
+          <div>
+            <div className="p-6 hidden md:block">
+              <div className="flex items-center mb-2">
+                <Leaf className="w-8 h-8 text-green-600 mr-2" />
+                <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-green-400 leading-tight">
+                  The Green Spot
+                </h1>
+              </div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 pl-1">POS & Inventory</p>
+            </div>
+
+            {/* Mobile Menu Header inside sidebar */}
+            <div className="md:hidden p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+              <span className="font-bold text-xl text-green-700 dark:text-green-500">Menu</span>
+              <button onClick={() => setIsMobileMenuOpen(false)}>
+                <X className="text-gray-400 dark:text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="px-4 space-y-2 mt-4 md:mt-0">
+              <button 
+                onClick={() => { setActiveTab(Tab.SALES); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === Tab.SALES ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+              >
+                <PlusCircle className="w-5 h-5 mr-3" />
+                Sales
+              </button>
+              <button 
+                onClick={() => { setActiveTab(Tab.INVENTORY); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === Tab.INVENTORY ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+              >
+                <Package className="w-5 h-5 mr-3" />
+                Inventory
+              </button>
+              <button 
+                onClick={() => { setActiveTab(Tab.REPORT); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === Tab.REPORT ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+              >
+                <FileText className="w-5 h-5 mr-3" />
+                Reports
+              </button>
+              <button 
+                onClick={() => { setActiveTab(Tab.SETTINGS); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === Tab.SETTINGS ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+              >
+                <LogOut className="w-5 h-5 mr-3" />
+                Sync Data
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 border-t border-gray-100 dark:border-gray-700 space-y-4">
+            <button 
+              onClick={toggleDarkMode}
+              className="w-full flex items-center justify-center p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              {isDarkMode ? <Sun className="w-5 h-5 mr-2" /> : <Moon className="w-5 h-5 mr-2" />}
+              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            </button>
+
+            <div className="bg-green-900 dark:bg-black/50 rounded-lg p-4 text-white text-center">
+              <p className="text-xs font-semibold opacity-80">Today's Total</p>
+              <p className="text-xl font-bold">{sales.reduce((a, b) => a + b.price, 0).toLocaleString()} ฿</p>
+            </div>
+          </div>
+        </nav>
+
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 relative bg-gray-100 dark:bg-gray-900 scroll-smooth transition-colors duration-200">
+          {renderContent()}
+        </main>
+
+        {/* Overlay for mobile menu */}
+        {isMobileMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
+            onClick={() => setIsMobileMenuOpen(false)}
+          ></div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default App;
