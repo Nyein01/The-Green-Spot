@@ -3,12 +3,7 @@ import { SaleItem, InventoryItem } from '../types';
 
 export const generateSalesAnalysis = async (sales: SaleItem[], inventory: InventoryItem[]): Promise<string> => {
   try {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      return "API Key not found. Cannot generate AI analysis.";
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     // Summarize data for the prompt to save tokens
     const totalRevenue = sales.reduce((sum, s) => sum + s.price, 0);
