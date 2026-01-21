@@ -1,23 +1,30 @@
 import React, { useState } from 'react';
-import { InventoryItem, ProductType, FlowerGrade } from '../../types';
-import { Plus, Edit2, Save, X, AlertTriangle, ClipboardList, AlertOctagon } from 'lucide-react';
+import { InventoryItem, ProductType, FlowerGrade } from '../types';
+import { Plus, Edit2, Save, X, ClipboardList, AlertOctagon, AlertTriangle, Minus, ShoppingCart, ArrowLeft } from 'lucide-react';
 import { generateId } from '../utils/pricing';
 
 interface InventoryManagerProps {
   inventory: InventoryItem[];
   onUpdateInventory: (item: InventoryItem) => void;
   onAdjustStock: (id: string, amount: number) => void;
+  onDeleteInventory: (id: string) => void;
 }
 
 export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, onUpdateInventory, onAdjustStock }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showOrderList, setShowOrderList] = useState(false);
+
+  // Filter inventory logic
+  const activeItems = inventory.filter(item => item.stockLevel > 0);
+  const outOfStockItems = inventory.filter(item => item.stockLevel <= 0);
 
   // Form state for new/edit item
   const [formState, setFormState] = useState<Partial<InventoryItem>>({
     category: ProductType.FLOWER,
     grade: FlowerGrade.MID,
-    stockLevel: 0
+    stockLevel: 0,
+    price: 0
   });
 
   const handleSave = () => {
@@ -29,6 +36,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
       name: formState.name,
       grade: formState.category === ProductType.FLOWER ? formState.grade : undefined,
       stockLevel: Number(formState.stockLevel) || 0,
+      price: Number(formState.price) || 0,
       lastUpdated: Date.now()
     };
     
@@ -39,83 +47,88 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
   const resetForm = () => {
     setIsAdding(false);
     setEditingId(null);
-    setFormState({ category: ProductType.FLOWER, grade: FlowerGrade.MID, stockLevel: 0 });
+    setFormState({ category: ProductType.FLOWER, grade: FlowerGrade.MID, stockLevel: 0, price: 0 });
   };
 
   const startEdit = (item: InventoryItem) => {
     setFormState(item);
     setEditingId(item.id);
     setIsAdding(true);
+    // If editing from order list, ensure we stay on order list if user cancels, 
+    // but the modal overlay works for both views.
   };
 
-  const handleCheckLowStock = () => {
-    const outOfStock = inventory.filter(item => item.stockLevel <= 0);
-    const lowStock = inventory.filter(item => item.stockLevel > 0 && item.stockLevel <= 10);
+  // Filter out 'Other' from available categories
+  const availableCategories = Object.values(ProductType).filter(t => t !== ProductType.OTHER);
 
-    if (outOfStock.length === 0 && lowStock.length === 0) {
-       alert("✅ Inventory Status: Healthy\nAll items have sufficient stock levels.");
-       return;
-    }
-
-    let message = "";
-
-    if (outOfStock.length > 0) {
-        message += "🚨 OUT OF STOCK (Order Immediately):\n";
-        message += outOfStock.map(i => `• ${i.name} (${i.category})`).join("\n");
-        message += "\n\n";
-    }
-
-    if (lowStock.length > 0) {
-        message += "⚠️ LOW STOCK (Order Soon):\n";
-        message += lowStock.map(i => `• ${i.name}: ${i.stockLevel} left`).join("\n");
-        message += "\n\n";
-    }
-
-    message += "Please copy this list for your supplier.";
-    alert(message);
-  };
+  const displayedInventory = showOrderList ? outOfStockItems : activeItems;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors">
       <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-700/30">
-        <h2 className="text-lg font-bold text-gray-800 dark:text-white">Inventory Management</h2>
+        <h2 className="text-lg font-bold text-gray-800 dark:text-white flex items-center">
+            {showOrderList ? (
+                <>
+                    <ShoppingCart className="w-5 h-5 mr-2 text-amber-500" />
+                    Order List ({outOfStockItems.length})
+                </>
+            ) : (
+                "Inventory Management"
+            )}
+        </h2>
         <div className="flex space-x-2">
             <button 
-              onClick={handleCheckLowStock}
-              className="flex items-center text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm"
-              title="Check for items that need reordering"
+              onClick={() => setShowOrderList(!showOrderList)}
+              className={`flex items-center text-xs px-3 py-1.5 rounded-lg transition-colors shadow-sm ${showOrderList ? 'bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-600 dark:text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}
             >
-              <ClipboardList className="w-3 h-3 mr-1" /> Order List
+              {showOrderList ? (
+                  <>
+                    <ArrowLeft className="w-3 h-3 mr-1" /> Back to Stock
+                  </>
+              ) : (
+                  <>
+                    <ClipboardList className="w-3 h-3 mr-1" /> Order List
+                    {outOfStockItems.length > 0 && (
+                        <span className="ml-1.5 bg-white text-amber-600 px-1.5 rounded-full text-[10px] font-bold">
+                            {outOfStockItems.length}
+                        </span>
+                    )}
+                  </>
+              )}
             </button>
-            <button 
-              onClick={() => setIsAdding(true)}
-              className="flex items-center text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors shadow-sm"
-            >
-              <Plus className="w-3 h-3 mr-1" /> Add Product
-            </button>
+            {!showOrderList && (
+                <button 
+                onClick={() => setIsAdding(true)}
+                className="flex items-center text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                >
+                <Plus className="w-3 h-3 mr-1" /> Add Product
+                </button>
+            )}
         </div>
       </div>
 
       {isAdding && (
         <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/30">
           <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-3">{editingId ? 'Edit Product' : 'Add New Product'}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-            <input 
-              type="text" 
-              placeholder="Product Name" 
-              value={formState.name || ''}
-              onChange={e => setFormState({...formState, name: e.target.value})}
-              className="p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md text-sm outline-none focus:border-blue-500"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
+            <div className="lg:col-span-2">
+                <input 
+                type="text" 
+                placeholder="Product Name" 
+                value={formState.name || ''}
+                onChange={e => setFormState({...formState, name: e.target.value})}
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md text-sm outline-none focus:border-blue-500"
+                />
+            </div>
             <select 
               value={formState.category}
               onChange={e => setFormState({...formState, category: e.target.value as ProductType})}
               className="p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md text-sm outline-none focus:border-blue-500"
             >
-              {Object.values(ProductType).map(t => <option key={t} value={t}>{t}</option>)}
+              {availableCategories.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
             
-            {formState.category === ProductType.FLOWER && (
+            {formState.category === ProductType.FLOWER ? (
               <select 
                 value={formState.grade}
                 onChange={e => setFormState({...formState, grade: e.target.value as FlowerGrade})}
@@ -123,6 +136,14 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
               >
                 {Object.values(FlowerGrade).map(g => <option key={g} value={g}>{g}</option>)}
               </select>
+            ) : (
+                <input 
+                type="number" 
+                placeholder="Unit Price (฿)" 
+                value={formState.price || ''}
+                onChange={e => setFormState({...formState, price: parseFloat(e.target.value)})}
+                className="p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md text-sm outline-none focus:border-blue-500"
+                />
             )}
 
             <input 
@@ -150,21 +171,32 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
             <tr>
               <th className="px-4 py-3">Product</th>
               <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Grade</th>
+              <th className="px-4 py-3">Details</th>
               <th className="px-4 py-3">Stock</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-            {inventory.length === 0 ? (
-               <tr><td colSpan={5} className="text-center py-4 text-gray-400 dark:text-gray-500">No items in inventory.</td></tr>
+            {displayedInventory.length === 0 ? (
+               <tr>
+                   <td colSpan={5} className="text-center py-8 text-gray-400 dark:text-gray-500">
+                       {showOrderList ? (
+                           <div className="flex flex-col items-center">
+                               <ClipboardList className="w-8 h-8 mb-2 opacity-50" />
+                               <p>Order list is empty. All items are in stock!</p>
+                           </div>
+                       ) : (
+                           "No items in inventory."
+                       )}
+                   </td>
+               </tr>
             ) : (
-              inventory.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+              displayedInventory.map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group">
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{item.name}</td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{item.category}</td>
                   <td className="px-4 py-3">
-                    {item.grade ? (
+                    {item.category === ProductType.FLOWER && item.grade ? (
                       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold 
                         ${item.grade === FlowerGrade.TOP_SHELF ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300' : 
                           item.grade === FlowerGrade.TOP ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' :
@@ -172,28 +204,43 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                           'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'}`}>
                         {item.grade}
                       </span>
-                    ) : '-'}
+                    ) : item.price ? (
+                        <span className="text-gray-600 dark:text-gray-400 font-mono text-xs">
+                            {item.price} ฿
+                        </span>
+                    ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center space-x-2">
-                      <span className={`font-mono ${item.stockLevel <= 0 ? 'text-red-600 dark:text-red-400 font-black text-xs' : item.stockLevel <= 10 ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-gray-700 dark:text-gray-300'}`}>
-                        {item.stockLevel <= 0 ? 'OUT OF STOCK' : item.stockLevel}
-                      </span>
-                      {item.stockLevel <= 0 ? (
-                         <AlertOctagon className="w-3 h-3 text-red-500 animate-pulse" />
-                      ) : item.stockLevel <= 10 ? (
-                         <AlertTriangle className="w-3 h-3 text-amber-500" />
-                      ) : null}
-                      <div className="flex flex-col space-y-0.5 ml-2">
-                         <button onClick={() => onAdjustStock(item.id, 1)} className="text-[10px] bg-gray-200 dark:bg-gray-600 dark:text-gray-200 px-1 rounded hover:bg-gray-300 dark:hover:bg-gray-500">▲</button>
-                         <button onClick={() => onAdjustStock(item.id, -1)} className="text-[10px] bg-gray-200 dark:bg-gray-600 dark:text-gray-200 px-1 rounded hover:bg-gray-300 dark:hover:bg-gray-500">▼</button>
-                      </div>
+                    <div className="flex items-center space-x-3">
+                       <button 
+                         onClick={() => onAdjustStock(item.id, -1)} 
+                         disabled={item.stockLevel <= 0 && showOrderList} // Can't go below 0 in order list view comfortably
+                         className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition-colors touch-manipulation disabled:opacity-30"
+                       >
+                         <Minus className="w-4 h-4" />
+                       </button>
+                       <div className="flex flex-col items-center w-16">
+                          <span className={`font-mono text-base ${item.stockLevel <= 0 ? 'text-red-600 dark:text-red-400 font-bold' : item.stockLevel <= 10 ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-gray-700 dark:text-gray-300'}`}>
+                            {item.stockLevel}
+                          </span>
+                          {item.stockLevel <= 0 && <span className="text-[10px] text-red-500 font-bold">EMPTY</span>}
+                       </div>
+                       <button 
+                         onClick={() => onAdjustStock(item.id, 1)} 
+                         className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition-colors touch-manipulation"
+                       >
+                         <Plus className="w-4 h-4" />
+                       </button>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => startEdit(item)} className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex justify-end space-x-1 items-center">
+                      <button onClick={() => startEdit(item)} className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

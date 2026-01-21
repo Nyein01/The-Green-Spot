@@ -1,4 +1,4 @@
-import { SaleItem, InventoryItem, ProductType } from '../../types';
+import { SaleItem, InventoryItem, ProductType } from '../types';
 import { db } from '../firebaseConfig';
 // @ts-ignore
 import { 
@@ -6,6 +6,7 @@ import {
   doc, 
   setDoc, 
   updateDoc, 
+  deleteDoc,
   onSnapshot, 
   query, 
   orderBy,
@@ -15,6 +16,11 @@ import {
 // Collection Names
 const SALES_COLLECTION = 'sales';
 const INVENTORY_COLLECTION = 'inventory';
+
+// Helper to sanitize objects for Firestore (removes undefined values)
+const sanitize = <T>(obj: T): T => {
+  return JSON.parse(JSON.stringify(obj));
+};
 
 // --- REAL-TIME SUBSCRIPTIONS ---
 
@@ -35,7 +41,7 @@ export const subscribeToSales = (callback: (sales: SaleItem[]) => void) => {
     if (error.code === 'permission-denied') {
         alert("DATABASE ERROR: Permission Denied.\n\nPlease go to Firebase Console > Firestore > Rules and set 'allow read, write: if true;'");
     } else {
-        alert("DATABASE CONNECTION ERROR: Check your internet or console logs.");
+        console.warn("Database connection issue (Sales):", error.message);
     }
   });
 };
@@ -63,21 +69,33 @@ export const subscribeToInventory = (callback: (inventory: InventoryItem[]) => v
 
 export const addSaleToCloud = async (sale: SaleItem) => {
   try {
-    // Save the sale document using its ID
-    await setDoc(doc(db, SALES_COLLECTION, sale.id), sale);
+    await setDoc(doc(db, SALES_COLLECTION, sale.id), sanitize(sale));
     return true;
-  } catch (e) {
+  } catch (e: any) {
     console.error("Error adding sale: ", e);
+    alert(`Failed to save sale: ${e.message}`);
+    return false;
+  }
+};
+
+export const deleteSaleFromCloud = async (saleId: string) => {
+  try {
+    await deleteDoc(doc(db, SALES_COLLECTION, saleId));
+    return true;
+  } catch (e: any) {
+    console.error("Error deleting sale: ", e);
+    alert(`Failed to delete sale: ${e.message}`);
     return false;
   }
 };
 
 export const updateInventoryInCloud = async (item: InventoryItem) => {
   try {
-    await setDoc(doc(db, INVENTORY_COLLECTION, item.id), item);
+    await setDoc(doc(db, INVENTORY_COLLECTION, item.id), sanitize(item));
     return true;
-  } catch (e) {
+  } catch (e: any) {
     console.error("Error updating inventory: ", e);
+    alert(`Failed to update inventory: ${e.message}`);
     return false;
   }
 };
@@ -85,25 +103,54 @@ export const updateInventoryInCloud = async (item: InventoryItem) => {
 export const adjustStockInCloud = async (itemId: string, currentStock: number, adjustment: number) => {
   try {
     const itemRef = doc(db, INVENTORY_COLLECTION, itemId);
-    // We pass the new calculated value directly to ensure consistency with the UI state passed in
     await updateDoc(itemRef, {
       stockLevel: currentStock + adjustment,
       lastUpdated: Date.now()
     });
     return true;
-  } catch (e) {
+  } catch (e: any) {
     console.error("Error adjusting stock: ", e);
+    // Don't alert on stock adjust for smoother UI, just log
+    return false;
+  }
+};
+
+export const deleteInventoryItemFromCloud = async (itemId: string) => {
+  try {
+    await deleteDoc(doc(db, INVENTORY_COLLECTION, itemId));
+    return true;
+  } catch (e: any) {
+    console.error("Error deleting inventory item: ", e);
+    alert(`Failed to delete item from database.\nError: ${e.message}\n\nCheck your internet or Firebase Rules.`);
     return false;
   }
 };
 
 export const clearSalesInCloud = async (sales: SaleItem[]) => {
-  const batch = writeBatch(db);
-  sales.forEach((sale) => {
-    const ref = doc(db, SALES_COLLECTION, sale.id);
-    batch.delete(ref);
-  });
-  await batch.commit();
+  if (sales.length === 0) return true;
+
+  const CHUNK_SIZE = 400;
+  const chunks = [];
+  
+  for (let i = 0; i < sales.length; i += CHUNK_SIZE) {
+    chunks.push(sales.slice(i, i + CHUNK_SIZE));
+  }
+
+  try {
+    for (const chunk of chunks) {
+        const batch = writeBatch(db);
+        chunk.forEach((sale) => {
+            const ref = doc(db, SALES_COLLECTION, sale.id);
+            batch.delete(ref);
+        });
+        await batch.commit();
+    }
+    return true;
+  } catch (e: any) {
+    console.error("Error clearing sales: ", e);
+    alert(`Failed to reset sales: ${e.message}`);
+    return false;
+  }
 };
 
 // --- MIGRATION TOOL (LocalStorage -> Firestore) ---
@@ -120,7 +167,7 @@ export const migrateLocalToCloud = async () => {
       const items: InventoryItem[] = JSON.parse(localInv);
       items.forEach(item => {
         const ref = doc(db, INVENTORY_COLLECTION, item.id);
-        batch.set(ref, item);
+        batch.set(ref, sanitize(item));
         count++;
       });
     }
@@ -129,7 +176,7 @@ export const migrateLocalToCloud = async () => {
       const sales: SaleItem[] = JSON.parse(localSales);
       sales.forEach(sale => {
         const ref = doc(db, SALES_COLLECTION, sale.id);
-        batch.set(ref, sale);
+        batch.set(ref, sanitize(sale));
         count++;
       });
     }
@@ -146,7 +193,6 @@ export const migrateLocalToCloud = async () => {
   }
 };
 
-// Fallback for default inventory if cloud is empty
 export const seedDefaultInventory = async () => {
     const defaultInventory: InventoryItem[] = [
       { id: '1', category: ProductType.FLOWER, name: 'Sour Diesel', grade: 'Mid' as any, stockLevel: 100, lastUpdated: Date.now() },
@@ -155,7 +201,7 @@ export const seedDefaultInventory = async () => {
     
     const batch = writeBatch(db);
     defaultInventory.forEach(item => {
-        batch.set(doc(db, INVENTORY_COLLECTION, item.id), item);
+        batch.set(doc(db, INVENTORY_COLLECTION, item.id), sanitize(item));
     });
     await batch.commit();
 }

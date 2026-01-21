@@ -22,11 +22,13 @@ import {
   addSaleToCloud,
   updateInventoryInCloud,
   adjustStockInCloud,
+  deleteSaleFromCloud,
+  deleteInventoryItemFromCloud,
   clearSalesInCloud,
   migrateLocalToCloud,
   seedDefaultInventory
 } from './services/storageService';
-import { SaleItem, InventoryItem } from '../types';
+import { SaleItem, InventoryItem } from './types';
 
 enum Tab {
   SALES = 'Sales',
@@ -44,6 +46,9 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [hasLocalData, setHasLocalData] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  
+  // Animation state for deletions
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   // Data Sync
   useEffect(() => {
@@ -105,13 +110,42 @@ const App: React.FC = () => {
       return;
     }
     
-    // 2. Adjust Inventory in Cloud
-    if (sale.productType !== 'Other') {
-       const item = inventory.find(i => i.name === sale.productName);
-       if (item) {
-         await adjustStockInCloud(item.id, item.stockLevel, -sale.quantity);
-       }
+    // 2. Adjust Inventory in Cloud (Matches by name now for all types)
+    const item = inventory.find(i => i.name === sale.productName);
+    if (item) {
+        await adjustStockInCloud(item.id, item.stockLevel, -sale.quantity);
     }
+  };
+
+  const handleDeleteSale = async (sale: SaleItem) => {
+    const confirmed = window.confirm(`Delete sale of ${sale.productName}? This will restore stock.`);
+    if(!confirmed) return;
+
+    // Start Animation
+    setDeletingIds(prev => {
+        const next = new Set(prev);
+        next.add(sale.id);
+        return next;
+    });
+
+    // Delay actual delete to allow animation to play
+    setTimeout(async () => {
+        // 1. Delete sale
+        await deleteSaleFromCloud(sale.id);
+
+        // 2. Restore Stock
+        const item = inventory.find(i => i.name === sale.productName);
+        if (item) {
+             await adjustStockInCloud(item.id, item.stockLevel, sale.quantity); // Add back
+        }
+        
+        // Remove from deleting set (item will be gone from sales array anyway)
+        setDeletingIds(prev => {
+            const next = new Set(prev);
+            next.delete(sale.id);
+            return next;
+        });
+    }, 400); // 400ms delay matches CSS transition
   };
 
   const handleUpdateInventory = async (item: InventoryItem) => {
@@ -126,16 +160,13 @@ const App: React.FC = () => {
   };
 
   const handleResetDay = async () => {
-    if(confirm("Are you sure you want to delete all sales data for today?")) {
-        await clearSalesInCloud(sales);
-    }
+    await clearSalesInCloud(sales);
   };
 
   const handleMigrate = async () => {
     if(confirm("This will upload your OLD offline data to the cloud. \n\nNote: The data you currently see on screen is already in the cloud. This button is only for recovering data from before the cloud update.")) {
         const result = await migrateLocalToCloud();
         alert(result);
-        // Re-check logic to hide button if migrated or empty
         const localSales = localStorage.getItem('greentrack_sales');
         const localInv = localStorage.getItem('greentrack_inventory');
         if ((!localSales || localSales === '[]') && (!localInv || localInv === '[]')) {
@@ -173,7 +204,10 @@ const App: React.FC = () => {
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 divide-y dark:divide-gray-700">
                 {sales.length === 0 && <div className="p-4 text-center text-gray-400 dark:text-gray-500">No sales today yet.</div>}
                 {sales.slice(0, 5).map(sale => (
-                  <div key={sale.id} className="p-4 flex justify-between items-center animate-fade-in">
+                  <div 
+                    key={sale.id} 
+                    className={`p-4 flex justify-between items-center group transition-all duration-500 ease-in-out transform ${deletingIds.has(sale.id) ? 'opacity-0 translate-x-12 max-h-0 py-0 overflow-hidden' : 'opacity-100 max-h-24'}`}
+                  >
                     <div>
                       <div className="font-medium text-gray-800 dark:text-gray-200">{sale.productName}</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">{new Date(sale.timestamp).toLocaleTimeString()} • {sale.quantity} units</div>
@@ -192,6 +226,7 @@ const App: React.FC = () => {
               inventory={inventory} 
               onUpdateInventory={handleUpdateInventory}
               onAdjustStock={handleAdjustStock}
+              onDeleteInventory={() => {}} // No-op as per requirement to remove delete functionality
             />
           </div>
         );
@@ -202,6 +237,8 @@ const App: React.FC = () => {
               sales={sales} 
               inventory={inventory}
               onReset={handleResetDay}
+              onDeleteSale={handleDeleteSale}
+              deletingIds={deletingIds}
             />
           </div>
         );

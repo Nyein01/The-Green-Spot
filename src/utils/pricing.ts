@@ -1,4 +1,4 @@
-import { FlowerGrade } from '../../types';
+import { FlowerGrade } from '../types';
 
 export const calculateFlowerPrice = (grade: FlowerGrade, weightGrams: number): number => {
   // Base logic: finds the best deal package. 

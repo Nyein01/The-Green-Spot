@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { SaleItem, InventoryItem } from '../../types';
+import { SaleItem, InventoryItem } from '../types';
 
 export const generateSalesAnalysis = async (sales: SaleItem[], inventory: InventoryItem[]): Promise<string> => {
   try {

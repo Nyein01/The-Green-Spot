@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { SaleItem, InventoryItem } from '../../types';
+import { SaleItem, InventoryItem } from '../types';
 import { formatCurrency } from '../utils/pricing';
 import { generateSalesAnalysis } from '../services/geminiService';
-import { RefreshCw, Wand2, Download, Leaf, TrendingUp, AlertTriangle, Loader2 } from 'lucide-react';
+import { RefreshCw, Wand2, Download, Leaf, TrendingUp, AlertTriangle, Loader2, Trash2 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -10,13 +10,16 @@ interface DailyReportProps {
   sales: SaleItem[];
   inventory: InventoryItem[];
   onReset: () => void;
+  onDeleteSale: (sale: SaleItem) => void;
+  deletingIds: Set<string>;
 }
 
-export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onReset }) => {
+export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onReset, onDeleteSale, deletingIds }) => {
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.price, 0);
   const totalItems = sales.length;
@@ -26,6 +29,13 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
     const result = await generateSalesAnalysis(sales, inventory);
     setAiAnalysis(result);
     setLoadingAi(false);
+  };
+
+  const handleReset = async () => {
+      setResetting(true);
+      await onReset();
+      setResetting(false);
+      setConfirmReset(false);
   };
 
   const handleDownloadPDF = async () => {
@@ -63,10 +73,6 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
       const imgWidth = pdfWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      // If image is taller than page, we might cut it off in this simple version, 
-      // but standard A4 usually fits a daily summary. 
-      // For a more robust solution we'd handle multi-page, but single page is best for this UI.
-      
       let heightLeft = imgHeight;
       let position = 0;
 
@@ -74,7 +80,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pdfHeight;
 
-      // Add pages if content spills over (basic implementation)
+      // Add pages if content spills over
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
@@ -135,7 +141,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
               </div>
             ) : (
               sales.map((sale, idx) => (
-                <div key={sale.id} className="flex justify-between items-start group hover:bg-gray-50 p-2 rounded transition-colors -mx-2">
+                <div key={sale.id} className={`flex justify-between items-start group hover:bg-gray-50 p-2 rounded transition-all duration-500 ease-in-out -mx-2 transform ${deletingIds.has(sale.id) ? 'opacity-0 translate-x-12 max-h-0 py-0 overflow-hidden' : 'opacity-100 max-h-24'}`}>
                   <div className="flex items-start">
                     <span className="text-gray-300 mr-3 text-xs w-4 font-mono">{idx + 1}.</span>
                     <div>
@@ -150,7 +156,21 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
                       </div>
                     </div>
                   </div>
-                  <div className="text-gray-900 font-bold">{formatCurrency(sale.price)}</div>
+                  <div className="flex items-center">
+                    <div className="text-gray-900 font-bold mr-2">{formatCurrency(sale.price)}</div>
+                    <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteSale(sale);
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                        title="Delete Sale"
+                        data-html2canvas-ignore
+                        disabled={deletingIds.has(sale.id)}
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -247,21 +267,25 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
             <button
               onClick={() => {
                   if (confirmReset) {
-                      onReset();
-                      setConfirmReset(false);
+                      handleReset();
                   } else {
                       setConfirmReset(true);
                       setTimeout(() => setConfirmReset(false), 3000);
                   }
               }}
+              disabled={resetting}
               className={`group w-full flex items-center justify-center font-medium py-3 rounded-xl transition-all border-2 ${
                   confirmReset 
                   ? 'bg-red-600 text-white border-red-600 hover:bg-red-700' 
                   : 'bg-white dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/50 hover:border-red-200'
               }`}
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${confirmReset ? 'animate-spin' : 'group-hover:rotate-180'} transition-transform duration-500`} />
-              {confirmReset ? 'Click again to confirm' : 'Reset Sales Data'}
+              {resetting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                  <RefreshCw className={`w-4 h-4 mr-2 ${confirmReset ? 'animate-spin' : 'group-hover:rotate-180'} transition-transform duration-500`} />
+              )}
+              {resetting ? 'Clearing Data...' : (confirmReset ? 'Click again to confirm' : 'Reset Sales Data')}
             </button>
             <p className="text-xs text-gray-400 dark:text-gray-500 text-center px-4">
               This action will permanently delete all sales records for the current session.
