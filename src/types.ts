@@ -43,3 +43,12 @@ export interface DayReport {
   itemsSold: number;
   sales: SaleItem[];
 }
+
+export enum Tab {
+  SALES = 'Sales',
+  INVENTORY = 'Inventory',
+  REPORT = 'Daily Report',
+  WEEKLY = 'Weekly Highlights',
+  MONTHLY = 'Monthly Summary',
+  SETTINGS = 'Settings'
+}

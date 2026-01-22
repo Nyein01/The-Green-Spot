@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { SaleItem, InventoryItem } from '../types';
 import { formatCurrency } from '../utils/pricing';
 import { generateSalesAnalysis } from '../services/geminiService';
-import { RefreshCw, Wand2, Download, Leaf, TrendingUp, AlertTriangle, Loader2, Trash2 } from 'lucide-react';
+import { RefreshCw, Wand2, Download, Leaf, TrendingUp, AlertTriangle, Loader2, Trash2, X, AlertCircle } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -21,6 +21,9 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
+  
+  // State for the custom delete confirmation modal
+  const [saleToDelete, setSaleToDelete] = useState<SaleItem | null>(null);
 
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.price, 0);
   const totalItems = sales.length;
@@ -39,6 +42,13 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
       setConfirmReset(false);
   };
 
+  const confirmDelete = () => {
+    if (saleToDelete) {
+      onDeleteSale(saleToDelete);
+      setSaleToDelete(null);
+    }
+  };
+
   const handleDownloadPDF = async () => {
     const element = document.getElementById('receipt-container');
     if (!element) return;
@@ -46,9 +56,8 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
     setDownloadingPdf(true);
 
     try {
-      // We use onclone to expand the scrollable area so the PDF captures the full list
       const canvas = await html2canvas(element, {
-        scale: 2, // Higher resolution
+        scale: 2,
         backgroundColor: '#ffffff',
         logging: false,
         useCORS: true,
@@ -77,11 +86,9 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
       let heightLeft = imgHeight;
       let position = 0;
 
-      // First page
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pdfHeight;
 
-      // Add pages if content spills over
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
@@ -109,9 +116,16 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
         .animate-fade-in-up {
           animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
+        @keyframes modalEnter {
+          from { opacity: 0; transform: scale(0.95) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-modal {
+          animation: modalEnter 0.2s ease-out forwards;
+        }
       `}</style>
 
-      {/* Receipt View - Always Keep Light/White for Paper Metaphor and PDF Savings */}
+      {/* Receipt View */}
       <div 
         id="receipt-container"
         className="bg-white p-4 sm:p-8 rounded-none sm:rounded-xl shadow-xl border-t-8 border-green-600 font-mono text-sm relative transition-all duration-300 hover:shadow-2xl"
@@ -162,7 +176,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
                     <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDeleteSale(sale);
+                          setSaleToDelete(sale);
                         }}
                         className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                         title="Delete Sale"
@@ -294,6 +308,52 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
           </div>
         </div>
       </div>
+
+      {/* Custom Confirmation Modal */}
+      {saleToDelete && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setSaleToDelete(null)}
+        >
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-modal border border-gray-100 dark:border-gray-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-center w-12 h-12 bg-red-50 dark:bg-red-900/20 rounded-full mx-auto mb-4">
+                <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <h3 className="text-xl font-bold text-center text-gray-900 dark:text-white mb-2">Delete Sale?</h3>
+              <p className="text-gray-600 dark:text-gray-400 text-center text-sm mb-6">
+                Are you sure you want to delete this sale of <span className="font-bold text-gray-900 dark:text-gray-200">{saleToDelete.productName}</span>? This action will restore the stock level and cannot be undone.
+              </p>
+              
+              <div className="flex flex-col space-y-3">
+                <button
+                  onClick={confirmDelete}
+                  className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-200 dark:shadow-none transition-all active:scale-95"
+                >
+                  Yes, Delete Sale
+                </button>
+                <button
+                  onClick={() => setSaleToDelete(null)}
+                  className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+            <div className="absolute top-3 right-3">
+              <button 
+                onClick={() => setSaleToDelete(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

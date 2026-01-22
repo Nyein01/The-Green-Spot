@@ -13,12 +13,15 @@ import {
   Wifi,
   WifiOff,
   Store,
-  LogOut
+  LogOut,
+  TrendingUp,
+  BarChart3
 } from 'lucide-react';
 import { LoginForm } from './components/LoginForm';
 import { SalesForm } from './components/SalesForm';
 import { InventoryManager } from './components/InventoryManager';
 import { DailyReport } from './components/DailyReport';
+import { HistoricalReport } from './components/HistoricalReport';
 import { 
   subscribeToSales, 
   subscribeToInventory,
@@ -31,14 +34,7 @@ import {
   migrateLocalToCloud,
   seedDefaultInventory
 } from './services/storageService';
-import { SaleItem, InventoryItem } from './types';
-
-enum Tab {
-  SALES = 'Sales',
-  INVENTORY = 'Inventory',
-  REPORT = 'Report',
-  SETTINGS = 'Settings'
-}
+import { SaleItem, InventoryItem, Tab } from './types';
 
 type ShopId = 'greenspot' | 'nearcannabis';
 
@@ -71,7 +67,6 @@ const App: React.FC = () => {
     if (!isAuthenticated) return;
 
     setLoading(true);
-    // Check local storage for theme preference
     const savedTheme = localStorage.getItem('greentrack_theme');
     if (savedTheme === 'dark') {
       setIsDarkMode(true);
@@ -79,20 +74,17 @@ const App: React.FC = () => {
       setIsDarkMode(true);
     }
     
-    // Monitor online status
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Check for legacy local data (only relevant for greenspot usually)
     const localSales = localStorage.getItem('greentrack_sales');
     const localInv = localStorage.getItem('greentrack_inventory');
     if ((localSales && localSales !== '[]') || (localInv && localInv !== '[]')) {
       setHasLocalData(true);
     }
 
-    // Subscribe to Firestore (Real-time updates) with Shop ID
     const unsubscribeSales = subscribeToSales(currentShop, (data) => {
       setSales(data);
     });
@@ -108,7 +100,7 @@ const App: React.FC = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [currentShop, isAuthenticated]); // Re-run when shop changes or auth changes
+  }, [currentShop, isAuthenticated]);
 
   const toggleDarkMode = () => {
     const newMode = !isDarkMode;
@@ -121,7 +113,6 @@ const App: React.FC = () => {
       alert("⚠️ You are offline. Sales cannot be saved to the cloud right now.");
       return;
     }
-    // 1. Add Sale to Cloud
     const success = await addSaleToCloud(currentShop, sale);
     
     if (!success) {
@@ -129,7 +120,6 @@ const App: React.FC = () => {
       return;
     }
     
-    // 2. Adjust Inventory in Cloud (Matches by name now for all types)
     const item = inventory.find(i => i.name === sale.productName);
     if (item) {
         await adjustStockInCloud(currentShop, item.id, item.stockLevel, -sale.quantity);
@@ -137,34 +127,25 @@ const App: React.FC = () => {
   };
 
   const handleDeleteSale = async (sale: SaleItem) => {
-    const confirmed = window.confirm(`Delete sale of ${sale.productName}? This will restore stock.`);
-    if(!confirmed) return;
-
-    // Start Animation
+    // Confirmation is now handled by the UI component for better UX
     setDeletingIds(prev => {
         const next = new Set(prev);
         next.add(sale.id);
         return next;
     });
 
-    // Delay actual delete to allow animation to play
     setTimeout(async () => {
-        // 1. Delete sale
         await deleteSaleFromCloud(currentShop, sale.id);
-
-        // 2. Restore Stock
         const item = inventory.find(i => i.name === sale.productName);
         if (item) {
-             await adjustStockInCloud(currentShop, item.id, item.stockLevel, sale.quantity); // Add back
+             await adjustStockInCloud(currentShop, item.id, item.stockLevel, sale.quantity);
         }
-        
-        // Remove from deleting set (item will be gone from sales array anyway)
         setDeletingIds(prev => {
             const next = new Set(prev);
             next.delete(sale.id);
             return next;
         });
-    }, 400); // 400ms delay matches CSS transition
+    }, 400);
   };
 
   const handleUpdateInventory = async (item: InventoryItem) => {
@@ -207,12 +188,10 @@ const App: React.FC = () => {
     setIsAuthenticated(false);
     setSales([]);
     setInventory([]);
-    // Reset to default
     setCurrentShop('greenspot');
     setIsSuperAdmin(false);
   }
 
-  // --- Auth Guard ---
   if (!isAuthenticated) {
       return <LoginForm onLogin={(shopId, isAdmin) => {
           setCurrentShop(shopId);
@@ -238,7 +217,7 @@ const App: React.FC = () => {
             <SalesForm 
               inventory={inventory} 
               onSaleComplete={handleNewSale} 
-              onStockUpdate={() => {}} // Handled via subscription now
+              onStockUpdate={() => {}} 
             />
             <div className="mt-8">
               <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4 px-1">Recent Transactions</h3>
@@ -267,7 +246,7 @@ const App: React.FC = () => {
               inventory={inventory} 
               onUpdateInventory={handleUpdateInventory}
               onAdjustStock={handleAdjustStock}
-              onDeleteInventory={() => {}} // No-op as per requirement to remove delete functionality
+              onDeleteInventory={() => {}} 
             />
           </div>
         );
@@ -280,6 +259,28 @@ const App: React.FC = () => {
               onReset={handleResetDay}
               onDeleteSale={handleDeleteSale}
               deletingIds={deletingIds}
+              shopName={shopNames[currentShop]}
+            />
+          </div>
+        );
+      case Tab.WEEKLY:
+        return (
+          <div className="pb-20 md:pb-0">
+            <HistoricalReport 
+              sales={sales} 
+              inventory={inventory}
+              timeframe="weekly"
+              shopName={shopNames[currentShop]}
+            />
+          </div>
+        );
+      case Tab.MONTHLY:
+        return (
+          <div className="pb-20 md:pb-0">
+            <HistoricalReport 
+              sales={sales} 
+              inventory={inventory}
+              timeframe="monthly"
               shopName={shopNames[currentShop]}
             />
           </div>
@@ -351,7 +352,7 @@ const App: React.FC = () => {
           fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
           md:relative md:translate-x-0 transition-transform duration-300 cubic-bezier(0.4, 0, 0.2, 1)
           w-72 bg-white dark:bg-gray-800 shadow-2xl md:shadow-lg z-50 flex flex-col justify-between
-          border-r dark:border-gray-700
+          border-r dark:border-gray-700 overflow-y-auto
         `}>
           <div>
             <div className="p-6 hidden md:block">
@@ -364,7 +365,6 @@ const App: React.FC = () => {
               <p className="text-xs text-gray-400 dark:text-gray-500 pl-1">POS & Inventory</p>
             </div>
 
-            {/* Shop Selector - Only shown for Super Admin */}
             {isSuperAdmin && (
               <div className="px-4 mb-4">
                   <div className="relative">
@@ -384,7 +384,6 @@ const App: React.FC = () => {
               </div>
             )}
             
-            {/* Mobile Menu Header inside sidebar */}
             <div className="md:hidden p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
               <span className="font-bold text-xl text-green-700 dark:text-green-500">Menu</span>
               <button onClick={() => setIsMobileMenuOpen(false)}>
@@ -392,7 +391,7 @@ const App: React.FC = () => {
               </button>
             </div>
             
-            <div className="px-4 space-y-2 mt-4 md:mt-0">
+            <div className="px-4 space-y-1 mt-4 md:mt-0">
               <button 
                 onClick={() => { setActiveTab(Tab.SALES); setIsMobileMenuOpen(false); }}
                 className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === Tab.SALES ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
@@ -407,13 +406,32 @@ const App: React.FC = () => {
                 <Package className="w-5 h-5 mr-3" />
                 Inventory
               </button>
-              <button 
-                onClick={() => { setActiveTab(Tab.REPORT); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === Tab.REPORT ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-              >
-                <FileText className="w-5 h-5 mr-3" />
-                Reports
-              </button>
+              
+              <div className="pt-4 pb-2">
+                <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Reports</p>
+                <button 
+                  onClick={() => { setActiveTab(Tab.REPORT); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === Tab.REPORT ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                >
+                  <FileText className="w-5 h-5 mr-3" />
+                  Daily
+                </button>
+                <button 
+                  onClick={() => { setActiveTab(Tab.WEEKLY); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === Tab.WEEKLY ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                >
+                  <TrendingUp className="w-5 h-5 mr-3" />
+                  Weekly
+                </button>
+                <button 
+                  onClick={() => { setActiveTab(Tab.MONTHLY); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === Tab.MONTHLY ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                >
+                  <BarChart3 className="w-5 h-5 mr-3" />
+                  Monthly
+                </button>
+              </div>
+
               <button 
                 onClick={() => { setActiveTab(Tab.SETTINGS); setIsMobileMenuOpen(false); }}
                 className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === Tab.SETTINGS ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
@@ -442,8 +460,8 @@ const App: React.FC = () => {
             </button>
 
             <div className="bg-green-900 dark:bg-black/50 rounded-lg p-4 text-white text-center">
-              <p className="text-xs font-semibold opacity-80">Today's Total ({shopNames[currentShop]})</p>
-              <p className="text-xl font-bold">{sales.reduce((a, b) => a + b.price, 0).toLocaleString()} ฿</p>
+              <p className="text-xs font-semibold opacity-80">Today's Total</p>
+              <p className="text-xl font-bold">{sales.filter(s => new Date(s.timestamp).toDateString() === new Date().toDateString()).reduce((a, b) => a + b.price, 0).toLocaleString()} ฿</p>
             </div>
           </div>
         </nav>
