@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { InventoryItem, ProductType, FlowerGrade } from '../types';
-import { Plus, Edit2, Save, X, ClipboardList, Minus, ShoppingCart, ArrowLeft, FileSpreadsheet, FileText, Loader2, ChevronUp, ChevronDown, ArrowUpDown, Leaf, Flame, Utensils, Zap, Package } from 'lucide-react';
+import { Plus, Edit2, Save, X, ClipboardList, Minus, ShoppingCart, ArrowLeft, FileSpreadsheet, FileText, Loader2, ChevronUp, ChevronDown, ArrowUpDown, Leaf, Flame, Utensils, Zap, Package, Search } from 'lucide-react';
 import { generateId } from '../utils/pricing';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
@@ -21,10 +21,11 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showOrderList, setShowOrderList] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Sorting state
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortField, setSortField] = useState<SortField>('grade'); // Default sort by grade
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc'); // Top Shelf first
 
   // Filter inventory logic
   const activeItems = inventory.filter(item => item.stockLevel > 0);
@@ -64,15 +65,45 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
     }
   };
 
+  // Grade Weight for sorting (Higher number = Better grade)
+  const getGradeWeight = (grade?: string): number => {
+    switch (grade) {
+      case FlowerGrade.TOP_SHELF: return 4;
+      case FlowerGrade.TOP: return 3;
+      case FlowerGrade.EXOTIC: return 2;
+      case FlowerGrade.MID: return 1;
+      default: return 0;
+    }
+  };
+
   // Grouped and Sorted Inventory
   const groupedInventory = useMemo(() => {
     const baseList = showOrderList ? outOfStockItems : activeItems;
     
-    // First, sort the entire base list
-    const sorted = [...baseList].sort((a, b) => {
-      let valA: any = a[sortField] || '';
-      let valB: any = b[sortField] || '';
+    // Filter by search query first
+    const filteredList = baseList.filter(item => {
+        const query = searchQuery.toLowerCase();
+        return (
+            item.name.toLowerCase().includes(query) ||
+            item.category.toLowerCase().includes(query) ||
+            (item.grade && item.grade.toLowerCase().includes(query))
+        );
+    });
 
+    // Then, sort the filtered list based on the criteria
+    const sorted = [...filteredList].sort((a, b) => {
+      let valA: any;
+      let valB: any;
+
+      if (sortField === 'grade') {
+        valA = getGradeWeight(a.grade);
+        valB = getGradeWeight(b.grade);
+      } else {
+        valA = a[sortField] || '';
+        valB = b[sortField] || '';
+      }
+
+      // Handle string case insensitivity
       if (typeof valA === 'string') valA = valA.toLowerCase();
       if (typeof valB === 'string') valB = valB.toLowerCase();
 
@@ -81,7 +112,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
       return 0;
     });
 
-    // Then, group them by category
+    // Then, group them by category for display
     const groups: Record<ProductType, InventoryItem[]> = {
       [ProductType.FLOWER]: [],
       [ProductType.PRE_ROLL]: [],
@@ -99,7 +130,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
     });
 
     return groups;
-  }, [showOrderList, activeItems, outOfStockItems, sortField, sortDirection]);
+  }, [showOrderList, activeItems, outOfStockItems, sortField, sortDirection, searchQuery]);
 
   const handleExportCSV = () => {
     if (inventory.length === 0) {
@@ -235,61 +266,90 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors animate-fade-in">
-      <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-50 dark:bg-gray-700/30 gap-3">
-        <h2 className="text-lg font-bold text-gray-800 dark:text-white flex items-center">
-            {showOrderList ? (
-                <>
-                    <ShoppingCart className="w-5 h-5 mr-2 text-amber-500" />
-                    Order List ({outOfStockItems.length})
-                </>
-            ) : (
-                "Inventory Management"
-            )}
-        </h2>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <button 
-              onClick={handleExportPDF}
-              disabled={isExportingPDF}
-              className="flex items-center text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm disabled:opacity-50"
-              title="Download Inventory as PDF"
-            >
-              {isExportingPDF ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileText className="w-3 h-3 mr-1" />} 
-              PDF
-            </button>
-            <button 
-              onClick={handleExportCSV}
-              className="flex items-center text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm"
-              title="Download Inventory as CSV"
-            >
-              <FileSpreadsheet className="w-3 h-3 mr-1" /> CSV
-            </button>
-            <button 
-              onClick={() => setShowOrderList(!showOrderList)}
-              className={`flex items-center text-xs px-3 py-1.5 rounded-lg transition-colors shadow-sm ${showOrderList ? 'bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-600 dark:text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}
-            >
-              {showOrderList ? (
-                  <>
-                    <ArrowLeft className="w-3 h-3 mr-1" /> Back to Stock
-                  </>
-              ) : (
-                  <>
-                    <ClipboardList className="w-3 h-3 mr-1" /> Order List
-                    {outOfStockItems.length > 0 && (
-                        <span className="ml-1.5 bg-white text-amber-600 px-1.5 rounded-full text-[10px] font-bold">
-                            {outOfStockItems.length}
-                        </span>
-                    )}
-                  </>
-              )}
-            </button>
-            {!showOrderList && (
+      <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-start xl:items-center bg-gray-50 dark:bg-gray-700/30 gap-3">
+        
+        <div className="flex items-center justify-between w-full xl:w-auto">
+            <h2 className="text-lg font-bold text-gray-800 dark:text-white flex items-center mr-4">
+                {showOrderList ? (
+                    <>
+                        <ShoppingCart className="w-5 h-5 mr-2 text-amber-500" />
+                        Order List ({outOfStockItems.length})
+                    </>
+                ) : (
+                    "Inventory Management"
+                )}
+            </h2>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full xl:w-auto">
+            
+            {/* Search Bar */}
+            <div className="relative w-full sm:w-64">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-4 w-4 text-gray-400" />
+                </div>
+                <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search product..."
+                    className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 outline-none transition-all"
+                />
+                {searchQuery && (
+                    <button 
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    >
+                        <X className="h-3 w-3" />
+                    </button>
+                )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
                 <button 
-                onClick={() => setIsAdding(true)}
-                className="flex items-center text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                onClick={handleExportPDF}
+                disabled={isExportingPDF}
+                className="flex items-center text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                title="Download Inventory as PDF"
                 >
-                <Plus className="w-3 h-3 mr-1" /> Add Product
+                {isExportingPDF ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileText className="w-3 h-3 mr-1" />} 
+                PDF
                 </button>
-            )}
+                <button 
+                onClick={handleExportCSV}
+                className="flex items-center text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+                title="Download Inventory as CSV"
+                >
+                <FileSpreadsheet className="w-3 h-3 mr-1" /> CSV
+                </button>
+                <button 
+                onClick={() => setShowOrderList(!showOrderList)}
+                className={`flex items-center text-xs px-3 py-1.5 rounded-lg transition-colors shadow-sm ${showOrderList ? 'bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-600 dark:text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}
+                >
+                {showOrderList ? (
+                    <>
+                        <ArrowLeft className="w-3 h-3 mr-1" /> Back to Stock
+                    </>
+                ) : (
+                    <>
+                        <ClipboardList className="w-3 h-3 mr-1" /> Order List
+                        {outOfStockItems.length > 0 && (
+                            <span className="ml-1.5 bg-white text-amber-600 px-1.5 rounded-full text-[10px] font-bold">
+                                {outOfStockItems.length}
+                            </span>
+                        )}
+                    </>
+                )}
+                </button>
+                {!showOrderList && (
+                    <button 
+                    onClick={() => setIsAdding(true)}
+                    className="flex items-center text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                    >
+                    <Plus className="w-3 h-3 mr-1" /> Add Product
+                    </button>
+                )}
+            </div>
         </div>
       </div>
 
@@ -400,7 +460,13 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
             {!hasData ? (
                <tr>
                    <td colSpan={5} className="text-center py-12 text-gray-400 dark:text-gray-500">
-                       {showOrderList ? (
+                       {searchQuery ? (
+                            <div className="flex flex-col items-center">
+                                <Search className="w-10 h-10 mb-2 opacity-30" />
+                                <p className="text-base font-medium">No matching items found.</p>
+                                <p className="text-xs opacity-75">Try a different search term.</p>
+                            </div>
+                       ) : showOrderList ? (
                            <div className="flex flex-col items-center">
                                <ClipboardList className="w-10 h-10 mb-2 opacity-30" />
                                <p className="text-base font-medium">Order list is empty.</p>
