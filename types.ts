@@ -24,6 +24,7 @@ export interface SaleItem {
   originalPrice: number; // Calculated standard price
   isNegotiated: boolean;
   notes?: string;
+  date?: string;
 }
 
 export interface InventoryItem {
@@ -33,12 +34,15 @@ export interface InventoryItem {
   grade?: FlowerGrade;
   stockLevel: number; // grams or units
   lastUpdated: number;
+  price?: number;
 }
 
 export interface DayReport {
+  id: string;
   date: string; // YYYY-MM-DD
   totalSales: number;
   totalRevenue: number;
   itemsSold: number;
   sales: SaleItem[];
+  timestamp?: number;
 }

@@ -1,28 +1,29 @@
 import React, { useState } from 'react';
-import { SaleItem, InventoryItem } from '../types';
-import { formatCurrency } from '../utils/pricing';
+import { SaleItem, InventoryItem, DayReport } from '../types';
+import { formatCurrency, generateId } from '../utils/pricing';
 import { generateSalesAnalysis } from '../services/geminiService';
-import { RefreshCw, Wand2, Download, Leaf, TrendingUp, AlertTriangle, Loader2, Trash2, X, AlertCircle } from 'lucide-react';
+import { saveDayReportToCloud } from '../services/storageService';
+import { Wand2, Download, Leaf, TrendingUp, Loader2, Trash2, X, AlertCircle, Save, CheckCircle2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
 interface DailyReportProps {
   sales: SaleItem[];
   inventory: InventoryItem[];
-  onReset: () => void;
   onDeleteSale: (sale: SaleItem) => void;
+  onReset: () => void;
   deletingIds: Set<string>;
   shopName: string;
 }
 
-export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onReset, onDeleteSale, deletingIds, shopName }) => {
+export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDeleteSale, onReset, deletingIds, shopName }) => {
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [savingReport, setSavingReport] = useState(false);
+  const [reportSaved, setReportSaved] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [resetting, setResetting] = useState(false);
   
-  // State for the custom delete confirmation modal
   const [saleToDelete, setSaleToDelete] = useState<SaleItem | null>(null);
 
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.price, 0);
@@ -35,15 +36,41 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
     setLoadingAi(false);
   };
 
-  const handleReset = async () => {
-      setResetting(true);
-      await onReset();
-      setResetting(false);
-      setConfirmReset(false);
+  const handleSaveAndArchive = async () => {
+    if (sales.length === 0) {
+        alert("No sales to archive.");
+        return;
+    }
+
+    setSavingReport(true);
+    
+    // Construct the shop ID slug (simplistic match for the current storageService logic)
+    const shopSlug = shopName.toLowerCase().includes('near') ? 'nearcannabis' : 'greenspot';
+
+    const report: DayReport = {
+        id: `report_${new Date().toISOString().split('T')[0]}_${generateId()}`,
+        date: new Date().toISOString().split('T')[0],
+        totalSales: sales.length,
+        totalRevenue,
+        itemsSold: sales.reduce((sum, s) => sum + s.quantity, 0),
+        sales: sales,
+        timestamp: Date.now()
+    };
+
+    const success = await saveDayReportToCloud(shopSlug, report);
+    
+    if (success) {
+        setReportSaved(true);
+        setTimeout(() => setReportSaved(false), 5000);
+        alert("Daily report has been saved to the archives!");
+    }
+    
+    setSavingReport(false);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (saleToDelete) {
+      // Call parent delete handler
       onDeleteSale(saleToDelete);
       setSaleToDelete(null);
     }
@@ -79,7 +106,6 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      
       const imgWidth = pdfWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
@@ -107,15 +133,8 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
   };
 
   return (
-    <div className="animate-fade-in-up grid grid-cols-1 lg:grid-cols-2 gap-6 pb-12">
+    <div className="animate-slide-up grid grid-cols-1 lg:grid-cols-2 gap-6 pb-12">
       <style>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in-up {
-          animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
         @keyframes modalEnter {
           from { opacity: 0; transform: scale(0.95) translateY(10px); }
           to { opacity: 1; transform: scale(1) translateY(0); }
@@ -128,7 +147,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
       {/* Receipt View */}
       <div 
         id="receipt-container"
-        className="bg-white p-4 sm:p-8 rounded-none sm:rounded-xl shadow-xl border-t-8 border-green-600 font-mono text-sm relative transition-all duration-300 hover:shadow-2xl"
+        className="bg-white p-4 sm:p-8 rounded-none sm:rounded-xl shadow-xl border-t-8 border-green-600 font-mono text-sm relative transition-all duration-300 hover:shadow-2xl hover:-translate-y-1"
       >
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
@@ -156,7 +175,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
               </div>
             ) : (
               sales.map((sale, idx) => (
-                <div key={sale.id} className={`flex justify-between items-start group hover:bg-gray-50 p-2 rounded transition-all duration-500 ease-in-out -mx-2 transform ${deletingIds.has(sale.id) ? 'opacity-0 translate-x-12 max-h-0 py-0 overflow-hidden' : 'opacity-100 max-h-24'}`}>
+                <div key={sale.id} className={`flex justify-between items-start group hover:bg-gray-50 p-2 rounded transition-all duration-500 ease-in-out -mx-2 transform ${deletingIds.has(sale.id) ? 'opacity-30 bg-red-50' : 'opacity-100'}`}>
                   <div className="flex items-start">
                     <span className="text-gray-300 mr-3 text-xs w-4 font-mono">{idx + 1}.</span>
                     <div>
@@ -183,7 +202,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
                         data-html2canvas-ignore
                         disabled={deletingIds.has(sale.id)}
                     >
-                        <Trash2 className="w-4 h-4" />
+                        {deletingIds.has(sale.id) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
@@ -232,6 +251,81 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
 
       {/* Analysis & Actions */}
       <div className="space-y-6">
+        {/* Save & Archive Section */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-green-100 dark:border-green-900/30 overflow-hidden transition-colors">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
+                    <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg mr-3 text-green-600 dark:text-green-400">
+                        <Save className="w-5 h-5" />
+                    </div>
+                    End of Day
+                </h3>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Save a permanent summary of today's sales to the cloud archives before clearing the data.
+            </p>
+            <button
+                onClick={handleSaveAndArchive}
+                disabled={savingReport || sales.length === 0}
+                className={`w-full flex items-center justify-center font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all transform active:scale-95 ${
+                    reportSaved 
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' 
+                    : 'bg-green-600 hover:bg-green-700 text-white shadow-green-100 dark:shadow-none'
+                } disabled:opacity-50`}
+            >
+                {savingReport ? (
+                    <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Archiving Data...
+                    </>
+                ) : reportSaved ? (
+                    <>
+                        <CheckCircle2 className="w-5 h-5 mr-2" />
+                        Daily Report Saved
+                    </>
+                ) : (
+                    <>
+                        <Save className="w-5 h-5 mr-2" />
+                        Save & Archive Day
+                    </>
+                )}
+            </button>
+        </div>
+
+        {/* Reset Data Section */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-red-100 dark:border-red-900/30 overflow-hidden transition-colors">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
+                    <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-lg mr-3 text-red-600 dark:text-red-400">
+                        <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    Reset Data
+                </h3>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Clear all current sales data. This is useful for starting a new shift or clearing test data.
+            </p>
+            <button
+                onClick={() => {
+                    if (confirmReset) {
+                        onReset();
+                        setConfirmReset(false);
+                    } else {
+                        setConfirmReset(true);
+                        setTimeout(() => setConfirmReset(false), 3000);
+                    }
+                }}
+                className={`w-full flex items-center justify-center font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all transform active:scale-95 ${
+                    confirmReset 
+                    ? 'bg-red-600 text-white' 
+                    : 'bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 border-2 border-red-100 dark:border-red-900/50 hover:border-red-200'
+                }`}
+            >
+                <RefreshCw className={`w-5 h-5 mr-2 ${confirmReset ? 'animate-spin' : ''}`} />
+                {confirmReset ? 'Confirm Reset' : 'Reset Sales Data'}
+            </button>
+        </div>
+
         {/* AI Insight Card */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-indigo-100 dark:border-indigo-900/50 overflow-hidden relative group transition-colors">
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 dark:bg-indigo-900/20 rounded-bl-full -mr-8 -mt-8 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
@@ -258,7 +352,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
           
           <div className="relative z-10 min-h-[120px]">
             {aiAnalysis ? (
-              <div className="prose prose-sm prose-indigo dark:prose-invert text-gray-600 dark:text-gray-300 bg-indigo-50/50 dark:bg-indigo-900/20 p-5 rounded-xl border border-indigo-100 dark:border-indigo-900/30 animate-fade-in-up">
+              <div className="prose prose-sm prose-indigo dark:prose-invert text-gray-600 dark:text-gray-300 bg-indigo-50/50 dark:bg-indigo-900/20 p-5 rounded-xl border border-indigo-100 dark:border-indigo-900/30 animate-fade-in">
                 <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{aiAnalysis}</pre>
               </div>
             ) : (
@@ -267,44 +361,6 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onRe
                 <p>Generate a smart summary of today's sales.</p>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Admin Actions */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-red-100 dark:border-red-900/30 relative overflow-hidden transition-colors">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center">
-            <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-lg mr-3 text-red-500 dark:text-red-400">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            Danger Zone
-          </h3>
-          <div className="flex flex-col space-y-3">
-            <button
-              onClick={() => {
-                  if (confirmReset) {
-                      handleReset();
-                  } else {
-                      setConfirmReset(true);
-                      setTimeout(() => setConfirmReset(false), 3000);
-                  }
-              }}
-              disabled={resetting}
-              className={`group w-full flex items-center justify-center font-medium py-3 rounded-xl transition-all border-2 ${
-                  confirmReset 
-                  ? 'bg-red-600 text-white border-red-600 hover:bg-red-700' 
-                  : 'bg-white dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/50 hover:border-red-200'
-              }`}
-            >
-              {resetting ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                  <RefreshCw className={`w-4 h-4 mr-2 ${confirmReset ? 'animate-spin' : 'group-hover:rotate-180'} transition-transform duration-500`} />
-              )}
-              {resetting ? 'Clearing Data...' : (confirmReset ? 'Click again to confirm' : 'Reset Sales Data')}
-            </button>
-            <p className="text-xs text-gray-400 dark:text-gray-500 text-center px-4">
-              This action will permanently delete all sales records for the current session.
-            </p>
           </div>
         </div>
       </div>

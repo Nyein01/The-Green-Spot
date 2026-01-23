@@ -1,4 +1,4 @@
-import { SaleItem, InventoryItem, ProductType } from '../types';
+import { SaleItem, InventoryItem, ProductType, DayReport } from '../types';
 import { db } from '../firebaseConfig';
 // @ts-ignore
 import { 
@@ -10,7 +10,8 @@ import {
   onSnapshot, 
   query, 
   orderBy,
-  writeBatch
+  writeBatch,
+  getDocs
 } from "firebase/firestore";
 
 // Helper to determine collection names based on shop ID
@@ -18,13 +19,15 @@ const getCollections = (shopId: string) => {
   if (shopId === 'nearcannabis') {
     return {
       sales: 'sales_nc',
-      inventory: 'inventory_nc'
+      inventory: 'inventory_nc',
+      reports: 'reports_nc'
     };
   }
-  // Default to original collections for The Green Spot to preserve existing data
+  // Default to original collections for The Green Spot
   return {
     sales: 'sales',
-    inventory: 'inventory'
+    inventory: 'inventory',
+    reports: 'reports'
   };
 };
 
@@ -38,7 +41,6 @@ const sanitize = <T>(obj: T): T => {
 // Listen to Sales updates
 export const subscribeToSales = (shopId: string, callback: (sales: SaleItem[]) => void) => {
   const { sales } = getCollections(shopId);
-  // Query sales ordered by timestamp descending (newest first)
   const q = query(collection(db, sales), orderBy("timestamp", "desc"));
   
   return onSnapshot(q, (snapshot) => {
@@ -49,12 +51,6 @@ export const subscribeToSales = (shopId: string, callback: (sales: SaleItem[]) =
     callback(salesData);
   }, (error) => {
     console.error("Error subscribing to sales:", error);
-    // @ts-ignore
-    if (error.code === 'permission-denied') {
-        alert("DATABASE ERROR: Permission Denied.\n\nPlease go to Firebase Console > Firestore > Rules and set 'allow read, write: if true;'");
-    } else {
-        console.warn("Database connection issue (Sales):", error.message);
-    }
   });
 };
 
@@ -71,10 +67,22 @@ export const subscribeToInventory = (shopId: string, callback: (inventory: Inven
     callback(inventoryData);
   }, (error) => {
     console.error("Error subscribing to inventory:", error);
-    // @ts-ignore
-    if (error.code === 'permission-denied') {
-        alert("DATABASE PERMISSION ERROR (Inventory):\n\nPlease go to Firebase Console > Firestore > Rules and change 'allow read, write: if false;' to 'allow read, write: if true;'");
-    }
+  });
+};
+
+// Listen to Archived Reports updates
+export const subscribeToReports = (shopId: string, callback: (reports: DayReport[]) => void) => {
+  const { reports } = getCollections(shopId);
+  const q = query(collection(db, reports), orderBy("timestamp", "desc"));
+  
+  return onSnapshot(q, (snapshot) => {
+    const reportsData: DayReport[] = [];
+    snapshot.forEach((doc) => {
+      reportsData.push(doc.data() as DayReport);
+    });
+    callback(reportsData);
+  }, (error) => {
+    console.error("Error subscribing to reports:", error);
   });
 };
 
@@ -87,7 +95,46 @@ export const addSaleToCloud = async (shopId: string, sale: SaleItem) => {
     return true;
   } catch (e: any) {
     console.error("Error adding sale: ", e);
-    alert(`Failed to save sale: ${e.message}`);
+    return false;
+  }
+};
+
+export const restoreSalesBatch = async (shopId: string, salesList: SaleItem[]) => {
+  const { sales } = getCollections(shopId);
+  const batch = writeBatch(db);
+  
+  salesList.forEach(sale => {
+    const ref = doc(db, sales, sale.id);
+    batch.set(ref, sanitize(sale));
+  });
+
+  try {
+    await batch.commit();
+    return true;
+  } catch (e) {
+    console.error("Batch restore failed", e);
+    return false;
+  }
+};
+
+export const saveDayReportToCloud = async (shopId: string, report: DayReport) => {
+  const { reports } = getCollections(shopId);
+  try {
+    await setDoc(doc(db, reports, report.id), sanitize(report));
+    return true;
+  } catch (e: any) {
+    console.error("Error saving day report: ", e);
+    return false;
+  }
+};
+
+export const deleteReportFromCloud = async (shopId: string, reportId: string) => {
+  const { reports } = getCollections(shopId);
+  try {
+    await deleteDoc(doc(db, reports, reportId));
+    return true;
+  } catch (e: any) {
+    console.error("Error deleting report: ", e);
     return false;
   }
 };
@@ -99,7 +146,6 @@ export const deleteSaleFromCloud = async (shopId: string, saleId: string) => {
     return true;
   } catch (e: any) {
     console.error("Error deleting sale: ", e);
-    alert(`Failed to delete sale: ${e.message}`);
     return false;
   }
 };
@@ -111,7 +157,6 @@ export const updateInventoryInCloud = async (shopId: string, item: InventoryItem
     return true;
   } catch (e: any) {
     console.error("Error updating inventory: ", e);
-    alert(`Failed to update inventory: ${e.message}`);
     return false;
   }
 };
@@ -131,88 +176,59 @@ export const adjustStockInCloud = async (shopId: string, itemId: string, current
   }
 };
 
-export const deleteInventoryItemFromCloud = async (shopId: string, itemId: string) => {
-  const { inventory } = getCollections(shopId);
-  try {
-    await deleteDoc(doc(db, inventory, itemId));
-    return true;
-  } catch (e: any) {
-    console.error("Error deleting inventory item: ", e);
-    alert(`Failed to delete item from database.\nError: ${e.message}`);
-    return false;
-  }
-};
-
 export const clearSalesInCloud = async (shopId: string, salesList: SaleItem[]) => {
   if (salesList.length === 0) return true;
   const { sales } = getCollections(shopId);
-
-  const CHUNK_SIZE = 400;
-  const chunks = [];
-  
-  for (let i = 0; i < salesList.length; i += CHUNK_SIZE) {
-    chunks.push(salesList.slice(i, i + CHUNK_SIZE));
-  }
-
   try {
-    for (const chunk of chunks) {
-        const batch = writeBatch(db);
-        chunk.forEach((sale) => {
-            const ref = doc(db, sales, sale.id);
-            batch.delete(ref);
-        });
-        await batch.commit();
-    }
+    const batch = writeBatch(db);
+    salesList.forEach((sale) => {
+      const ref = doc(db, sales, sale.id);
+      batch.delete(ref);
+    });
+    await batch.commit();
     return true;
   } catch (e: any) {
     console.error("Error clearing sales: ", e);
-    alert(`Failed to reset sales: ${e.message}`);
     return false;
   }
 };
 
-// --- MIGRATION TOOL (LocalStorage -> Firestore) ---
-// Note: Migration only supports the default shop (Green Spot) for now as legacy data belongs there.
+export const clearAllReportsInCloud = async (shopId: string) => {
+  const { reports } = getCollections(shopId);
+  try {
+    const q = query(collection(db, reports));
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(db);
+    
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+    return true;
+  } catch (e: any) {
+    console.error("Error clearing all reports: ", e);
+    return false;
+  }
+};
+
 export const migrateLocalToCloud = async () => {
   try {
     const localSales = localStorage.getItem('greentrack_sales');
     const localInv = localStorage.getItem('greentrack_inventory');
-    
-    // Default collections
-    const SALES_COLLECTION = 'sales';
-    const INVENTORY_COLLECTION = 'inventory';
-    
     const batch = writeBatch(db);
     let count = 0;
-
     if (localInv) {
       const items: InventoryItem[] = JSON.parse(localInv);
-      items.forEach(item => {
-        const ref = doc(db, INVENTORY_COLLECTION, item.id);
-        batch.set(ref, sanitize(item));
-        count++;
-      });
+      items.forEach(item => { batch.set(doc(db, 'inventory', item.id), sanitize(item)); count++; });
     }
-
     if (localSales) {
       const sales: SaleItem[] = JSON.parse(localSales);
-      sales.forEach(sale => {
-        const ref = doc(db, SALES_COLLECTION, sale.id);
-        batch.set(ref, sanitize(sale));
-        count++;
-      });
+      sales.forEach(sale => { batch.set(doc(db, 'sales', sale.id), sanitize(sale)); count++; });
     }
-
-    if (count > 0) {
-      await batch.commit();
-      return `Successfully migrated ${count} items to cloud!`;
-    }
-    return "No legacy offline data found on this device.";
-
-  } catch (e) {
-    console.error("Migration failed", e);
-    return "Migration failed. Check console for details.";
-  }
+    if (count > 0) { await batch.commit(); return `Migrated ${count} items!`; }
+    return "No legacy data found.";
+  } catch (e) { return "Migration failed."; }
 };
 
 export const seedDefaultInventory = async (shopId: string) => {
@@ -221,10 +237,7 @@ export const seedDefaultInventory = async (shopId: string) => {
       { id: '1', category: ProductType.FLOWER, name: 'Sour Diesel', grade: 'Mid' as any, stockLevel: 100, lastUpdated: Date.now() },
       { id: '2', category: ProductType.FLOWER, name: 'Blue Dream', grade: 'Top' as any, stockLevel: 50, lastUpdated: Date.now() },
     ];
-    
     const batch = writeBatch(db);
-    defaultInventory.forEach(item => {
-        batch.set(doc(db, inventory, item.id), sanitize(item));
-    });
+    defaultInventory.forEach(item => { batch.set(doc(db, inventory, item.id), sanitize(item)); });
     await batch.commit();
 }

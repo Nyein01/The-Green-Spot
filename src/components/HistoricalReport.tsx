@@ -63,7 +63,7 @@ export const HistoricalReport: React.FC<HistoricalReportProps> = ({ sales, inven
       return acc;
     }, {} as Record<string, { name: string; qty: number; revenue: number; type: string; grade?: string }>);
 
-    return Object.values(stats).sort((a, b) => b.qty - a.qty).slice(0, 6);
+    return (Object.values(stats) as { name: string; qty: number; revenue: number; type: string; grade?: string }[]).sort((a, b) => b.qty - a.qty).slice(0, 6);
   }, [filteredSales]);
 
   const handleGenerateInsight = async () => {

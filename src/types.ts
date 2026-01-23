@@ -16,6 +16,7 @@ export enum FlowerGrade {
 export interface SaleItem {
   id: string;
   timestamp: number; // Unix timestamp
+  date: string; // YYYY-MM-DD for easier filtering
   productType: ProductType;
   productName: string; // Strain name or Custom name
   grade?: FlowerGrade;
@@ -37,17 +38,20 @@ export interface InventoryItem {
 }
 
 export interface DayReport {
+  id: string;
   date: string; // YYYY-MM-DD
   totalSales: number;
   totalRevenue: number;
   itemsSold: number;
   sales: SaleItem[];
+  timestamp: number;
 }
 
 export enum Tab {
   SALES = 'Sales',
   INVENTORY = 'Inventory',
   REPORT = 'Daily Report',
+  ARCHIVE = 'Sales Archive',
   WEEKLY = 'Weekly Highlights',
   MONTHLY = 'Monthly Summary',
   SETTINGS = 'Settings'
