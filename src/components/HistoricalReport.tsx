@@ -1,17 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { SaleItem, InventoryItem } from '../types';
 import { formatCurrency } from '../utils/pricing';
-import { generateSalesAnalysis } from '../services/geminiService';
 import { 
   TrendingUp, 
   Award, 
-  BarChart3, 
   Calendar, 
-  Wand2, 
-  Loader2, 
-  Package, 
-  ArrowUpRight,
-  ChevronRight
+  Package
 } from 'lucide-react';
 
 interface HistoricalReportProps {
@@ -22,9 +16,6 @@ interface HistoricalReportProps {
 }
 
 export const HistoricalReport: React.FC<HistoricalReportProps> = ({ sales, inventory, timeframe, shopName }) => {
-  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
-  const [loadingAi, setLoadingAi] = useState(false);
-
   // Filter sales based on timeframe
   const filteredSales = useMemo(() => {
     const now = new Date();
@@ -66,13 +57,6 @@ export const HistoricalReport: React.FC<HistoricalReportProps> = ({ sales, inven
     return (Object.values(stats) as { name: string; qty: number; revenue: number; type: string; grade?: string }[]).sort((a, b) => b.qty - a.qty).slice(0, 6);
   }, [filteredSales]);
 
-  const handleGenerateInsight = async () => {
-    setLoadingAi(true);
-    const result = await generateSalesAnalysis(filteredSales, inventory, timeframe);
-    setAiAnalysis(result);
-    setLoadingAi(false);
-  };
-
   const periodLabel = timeframe === 'weekly' ? 'This Week' : 'This Month';
   const accentColor = timeframe === 'weekly' ? 'indigo' : 'purple';
 
@@ -113,9 +97,9 @@ export const HistoricalReport: React.FC<HistoricalReportProps> = ({ sales, inven
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="w-full">
         {/* Best Sellers List */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden w-full">
           <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-700/30">
             <h3 className="font-bold text-gray-800 dark:text-white flex items-center">
               <Award className="w-5 h-5 mr-2 text-yellow-500" />
@@ -152,48 +136,6 @@ export const HistoricalReport: React.FC<HistoricalReportProps> = ({ sales, inven
                   </div>
                 </div>
               ))
-            )}
-          </div>
-        </div>
-
-        {/* AI Insight Section */}
-        <div className={`bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-${accentColor}-100 dark:border-${accentColor}-900/30 overflow-hidden relative`}>
-          <div className={`absolute top-0 right-0 w-32 h-32 bg-${accentColor}-50 dark:bg-${accentColor}-900/20 rounded-bl-full -mr-8 -mt-8 opacity-50`}></div>
-          
-          <div className="flex items-center justify-between mb-6 relative z-10">
-            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
-              <div className={`p-2 bg-${accentColor}-100 dark:bg-${accentColor}-900/50 rounded-lg mr-3 text-${accentColor}-600 dark:text-${accentColor}-400`}>
-                <Wand2 className="w-5 h-5" />
-              </div>
-              Executive Analysis
-            </h3>
-            <button
-              onClick={handleGenerateInsight}
-              disabled={loadingAi || filteredSales.length === 0}
-              className={`text-xs px-4 py-2 rounded-full font-semibold transition-all shadow-sm ${
-                loadingAi 
-                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
-                  : `bg-${accentColor}-600 text-white hover:bg-${accentColor}-700 shadow-${accentColor}-200 shadow-lg active:scale-95`
-              }`}
-            >
-              {loadingAi ? 'Analyzing Trends...' : `Generate ${timeframe === 'weekly' ? 'Weekly' : 'Monthly'} Highlight`}
-            </button>
-          </div>
-          
-          <div className="relative z-10 min-h-[300px]">
-            {aiAnalysis ? (
-              <div className="prose prose-sm prose-indigo dark:prose-invert text-gray-600 dark:text-gray-300 bg-white/50 dark:bg-gray-900/50 p-6 rounded-xl border border-gray-100 dark:border-gray-700 animate-fade-in shadow-inner">
-                 <div className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{aiAnalysis}</div>
-                 <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
-                    <p className="text-[10px] text-gray-400 italic">Report generated for {shopName} management</p>
-                 </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-500 text-sm bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700 border-dashed">
-                <BarChart3 className="w-12 h-12 mb-4 opacity-20" />
-                <p className="font-medium">Unlock deep business insights</p>
-                <p className="text-xs mt-1">Get an AI-powered breakdown of your {timeframe} performance.</p>
-              </div>
             )}
           </div>
         </div>

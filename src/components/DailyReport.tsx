@@ -1,9 +1,21 @@
 import React, { useState } from 'react';
 import { SaleItem, InventoryItem, DayReport } from '../types';
 import { formatCurrency, generateId } from '../utils/pricing';
-import { generateSalesAnalysis } from '../services/geminiService';
 import { saveDayReportToCloud } from '../services/storageService';
-import { Wand2, Download, Leaf, TrendingUp, Loader2, Trash2, X, AlertCircle, Save, CheckCircle2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { 
+  Download, 
+  Leaf, 
+  TrendingUp, 
+  Loader2, 
+  Trash2, 
+  X, 
+  AlertCircle, 
+  Save, 
+  CheckCircle2, 
+  RefreshCw, 
+  AlertTriangle,
+  Coins
+} from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -17,25 +29,14 @@ interface DailyReportProps {
 }
 
 export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDeleteSale, onReset, deletingIds, shopName }) => {
-  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
-  const [loadingAi, setLoadingAi] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
   const [reportSaved, setReportSaved] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  
   const [saleToDelete, setSaleToDelete] = useState<SaleItem | null>(null);
 
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.price, 0);
-  const totalItems = sales.length;
-
-  const handleGenerateInsight = async () => {
-    setLoadingAi(true);
-    const result = await generateSalesAnalysis(sales, inventory);
-    setAiAnalysis(result);
-    setLoadingAi(false);
-  };
-
+  
   const handleSaveAndArchive = async () => {
     if (sales.length === 0) {
         alert("No sales to archive.");
@@ -44,8 +45,9 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
 
     setSavingReport(true);
     
-    // Construct the shop ID slug (simplistic match for the current storageService logic)
-    const shopSlug = shopName.toLowerCase().includes('near') ? 'nearcannabis' : 'greenspot';
+    // Determine shopId from shopName
+    let shopId = 'greenspot';
+    if (shopName.toLowerCase().includes('near')) shopId = 'nearcannabis';
 
     const report: DayReport = {
         id: `report_${new Date().toISOString().split('T')[0]}_${generateId()}`,
@@ -57,12 +59,14 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
         timestamp: Date.now()
     };
 
-    const success = await saveDayReportToCloud(shopSlug, report);
+    const success = await saveDayReportToCloud(shopId, report);
     
     if (success) {
         setReportSaved(true);
         setTimeout(() => setReportSaved(false), 5000);
         alert("Daily report has been saved to the archives!");
+    } else {
+        alert("Failed to save report. Please check connection.");
     }
     
     setSavingReport(false);
@@ -70,7 +74,6 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
 
   const confirmDelete = async () => {
     if (saleToDelete) {
-      // Call parent delete handler
       onDeleteSale(saleToDelete);
       setSaleToDelete(null);
     }
@@ -163,14 +166,14 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
           </div>
         </div>
 
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase mb-3 border-b border-gray-200 pb-2 tracking-wider">
             <span>Item Description</span>
             <span>Amount</span>
           </div>
-          <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 receipt-scroll text-gray-800">
+          <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2 receipt-scroll text-gray-800">
             {sales.length === 0 ? (
-              <div className="text-center py-10 text-gray-400 italic bg-gray-50 rounded-lg border border-gray-100 border-dashed">
+              <div className="text-center py-6 text-gray-400 italic bg-gray-50 rounded-lg border border-gray-100 border-dashed">
                 No transactions recorded yet.
               </div>
             ) : (
@@ -211,14 +214,16 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
           </div>
         </div>
 
-        <div className="space-y-4 pt-6 border-t-2 border-dashed border-gray-300">
-          <div className="flex justify-between text-gray-500 text-xs uppercase tracking-wide">
-            <span>Total Sold Items</span>
-            <span className="font-mono">{totalItems}</span>
+        <div className="space-y-3 pt-6 border-t-2 border-dashed border-gray-300">
+          
+          <div className="flex justify-between items-center text-gray-500 text-xs">
+            <span className="flex items-center"><TrendingUp className="w-3 h-3 mr-1" /> Items Sold</span>
+            <span className="font-mono font-bold">{sales.length}</span>
           </div>
-          <div className="flex justify-between items-end bg-gray-50 p-4 rounded-lg border border-gray-100">
-            <span className="text-sm font-bold text-gray-600 uppercase tracking-tight flex items-center">
-              <TrendingUp className="w-4 h-4 mr-2 text-green-600" />
+
+          <div className="flex justify-between items-end bg-gray-50 p-4 rounded-lg border border-gray-100 mt-2">
+            <span className="text-sm font-bold text-gray-800 uppercase tracking-tight flex items-center">
+              <Coins className="w-5 h-5 mr-2 text-green-600" />
               Total Revenue
             </span>
             <span className="text-3xl font-black text-gray-900 tracking-tight">{formatCurrency(totalRevenue)}</span>
@@ -251,6 +256,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
 
       {/* Analysis & Actions */}
       <div className="space-y-6">
+        
         {/* Save & Archive Section */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-green-100 dark:border-green-900/30 overflow-hidden transition-colors">
             <div className="flex items-center justify-between mb-4">
@@ -324,44 +330,6 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
                 <RefreshCw className={`w-5 h-5 mr-2 ${confirmReset ? 'animate-spin' : ''}`} />
                 {confirmReset ? 'Confirm Reset' : 'Reset Sales Data'}
             </button>
-        </div>
-
-        {/* AI Insight Card */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-indigo-100 dark:border-indigo-900/50 overflow-hidden relative group transition-colors">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 dark:bg-indigo-900/20 rounded-bl-full -mr-8 -mt-8 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
-          
-          <div className="flex items-center justify-between mb-6 relative z-10">
-            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
-              <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg mr-3 text-indigo-600 dark:text-indigo-400">
-                <Wand2 className="w-5 h-5" />
-              </div>
-              AI Insights
-            </h3>
-            <button
-              onClick={handleGenerateInsight}
-              disabled={loadingAi || sales.length === 0}
-              className={`text-xs px-4 py-2 rounded-full font-semibold transition-all shadow-sm ${
-                loadingAi 
-                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
-                  : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-indigo-200 hover:shadow-lg active:scale-95'
-              }`}
-            >
-              {loadingAi ? 'Analyzing...' : 'Generate Analysis'}
-            </button>
-          </div>
-          
-          <div className="relative z-10 min-h-[120px]">
-            {aiAnalysis ? (
-              <div className="prose prose-sm prose-indigo dark:prose-invert text-gray-600 dark:text-gray-300 bg-indigo-50/50 dark:bg-indigo-900/20 p-5 rounded-xl border border-indigo-100 dark:border-indigo-900/30 animate-fade-in">
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{aiAnalysis}</pre>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-gray-400 dark:text-gray-500 text-sm bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700 border-dashed">
-                <Wand2 className="w-8 h-8 mb-2 opacity-20" />
-                <p>Generate a smart summary of today's sales.</p>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 

@@ -37,6 +37,13 @@ export interface InventoryItem {
   lastUpdated: number;
 }
 
+export interface Expense {
+  id: string;
+  description: string;
+  amount: number;
+  timestamp: number;
+}
+
 export interface DayReport {
   id: string;
   date: string; // YYYY-MM-DD
@@ -44,6 +51,8 @@ export interface DayReport {
   totalRevenue: number;
   itemsSold: number;
   sales: SaleItem[];
+  expenses?: Expense[];
+  inboxMoney?: number;
   timestamp: number;
 }
 

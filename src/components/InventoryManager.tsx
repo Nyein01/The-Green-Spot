@@ -173,14 +173,71 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
     try {
       const canvas = await html2canvas(element, {
         scale: 2,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#000000', // Pure black background
         logging: false,
         useCORS: true,
         onclone: (clonedDoc) => {
-          const table = clonedDoc.getElementById('inventory-table-container');
-          if (table) {
-            table.style.maxHeight = 'none';
-            table.style.overflow = 'visible';
+          const container = clonedDoc.getElementById('inventory-table-container');
+          if (container) {
+            container.style.maxHeight = 'none';
+            container.style.overflow = 'visible';
+            container.style.backgroundColor = '#000000';
+            container.style.color = '#ffffff';
+            container.style.padding = '20px';
+
+            // Show and style the header for black background
+            const header = container.querySelector('.hidden.print\\:block');
+            if (header) {
+                (header as HTMLElement).classList.remove('hidden');
+                (header as HTMLElement).style.display = 'block';
+                (header as HTMLElement).style.backgroundColor = '#000000';
+                (header as HTMLElement).style.borderBottom = '2px solid #22c55e';
+                
+                const h1 = header.querySelector('h1');
+                if (h1) {
+                    h1.style.color = '#ffffff';
+                    h1.classList.remove('text-gray-800');
+                }
+                
+                const p = header.querySelector('p');
+                if (p) {
+                    p.style.color = '#a3a3a3';
+                    p.classList.remove('text-gray-500');
+                }
+            }
+
+            // Force text colors to white/light gray
+            const allText = container.querySelectorAll('*');
+            allText.forEach((el) => {
+                const style = window.getComputedStyle(el);
+                // If text is dark (default), make it light
+                if (style.color === 'rgb(0, 0, 0)' || style.color === 'rgb(31, 41, 55)' || style.color === 'rgb(55, 65, 81)' || style.color === 'rgb(17, 24, 39)') {
+                    (el as HTMLElement).style.color = '#e5e5e5';
+                }
+                
+                // Specifically target common tailwind text classes if computed style check isn't enough
+                if (el.classList.contains('text-gray-900') || el.classList.contains('text-gray-800') || el.classList.contains('text-gray-700')) {
+                   (el as HTMLElement).style.color = '#ffffff';
+                }
+                if (el.classList.contains('text-gray-500')) {
+                   (el as HTMLElement).style.color = '#a3a3a3';
+                }
+            });
+
+            // Darken table headers
+            const thead = container.querySelector('thead');
+            if (thead) {
+                (thead as HTMLElement).style.backgroundColor = '#111111';
+                (thead as HTMLElement).style.color = '#ffffff';
+            }
+            
+            // Fix rows hover/backgrounds if any
+            const rows = container.querySelectorAll('tr');
+            rows.forEach(row => {
+                row.style.backgroundColor = 'transparent';
+                row.style.borderBottomColor = '#333333';
+            });
+
             const actions = clonedDoc.querySelectorAll('[data-pdf-hide]');
             actions.forEach(el => (el as HTMLElement).style.display = 'none');
           }
@@ -202,12 +259,20 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
       let heightLeft = imgHeight;
       let position = 0;
 
+      // Fill PDF background with black
+      pdf.setFillColor(0, 0, 0);
+      pdf.rect(0, 0, pdfWidth, pdfHeight, 'F');
+
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pdfHeight;
 
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
+        // Fill new page background
+        pdf.setFillColor(0, 0, 0);
+        pdf.rect(0, 0, pdfWidth, pdfHeight, 'F');
+        
         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
         heightLeft -= pdfHeight;
       }
@@ -412,8 +477,8 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
       )}
 
       <div className="overflow-x-auto" id="inventory-table-container">
-        {/* PDF Header (Only visible when captured) */}
-        <div className="hidden print:block p-8 border-b-2 border-green-600 mb-6 bg-white">
+        {/* PDF Header (Only visible when captured, styled to be white text on black for PDF in onclone) */}
+        <div className="hidden print:block p-8 border-b-2 border-green-600 mb-6">
            <h1 className="text-3xl font-black text-gray-800 uppercase tracking-widest">{shopName}</h1>
            <p className="text-gray-500 font-mono text-sm uppercase">Inventory Status Report • {new Date().toLocaleDateString()}</p>
         </div>
