@@ -17,7 +17,9 @@ import {
   Wallet,
   Plus,
   Banknote,
-  QrCode
+  QrCode,
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
@@ -53,7 +55,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({
   const [confirmReset, setConfirmReset] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState<SaleItem | null>(null);
-
+  
   // Expense Form State
   const [expDesc, setExpDesc] = useState('');
   const [expAmount, setExpAmount] = useState('');
@@ -141,27 +143,167 @@ export const DailyReport: React.FC<DailyReportProps> = ({
     setIsAddingExpense(false);
   };
 
+  // --- NEW PDF GENERATION LOGIC ---
   const handleDownloadPDF = async () => {
-    const element = document.getElementById('receipt-container');
-    if (!element) return;
-
     setDownloadingPdf(true);
 
     try {
-      const canvas = await html2canvas(element, {
-        scale: 2,
+      // 1. Create a dedicated off-screen container for the PDF
+      // This allows us to style it specifically for A4 paper (Cleaner, more corporate)
+      // instead of just screenshotting the receipt view.
+      const printContainer = document.createElement('div');
+      printContainer.id = 'pdf-print-container';
+      
+      // Force desktop-like width and specific styling for the report
+      Object.assign(printContainer.style, {
+        position: 'fixed',
+        top: '-10000px', // Hide off-screen
+        left: '0',
+        width: '1200px', // High resolution width
         backgroundColor: '#ffffff',
-        logging: false,
-        useCORS: true,
-        onclone: (clonedDoc) => {
-          const scrollableDiv = clonedDoc.querySelector('.receipt-scroll') as HTMLElement;
-          if (scrollableDiv) {
-            scrollableDiv.style.maxHeight = 'none';
-            scrollableDiv.style.overflow = 'visible';
-          }
-        }
+        fontFamily: "'Inter', sans-serif",
+        color: '#111827',
+        padding: '60px'
       });
 
+      // 2. Prepare Data
+      const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      const timeStr = new Date().toLocaleTimeString();
+      const netProfit = totalRevenue - totalExpenses;
+
+      // 3. Build HTML Structure
+
+      // Sales Table Rows
+      const salesRowsHtml = sales.map((sale, index) => {
+          const isOdd = index % 2 !== 0;
+          return `
+            <tr style="background-color: ${isOdd ? '#f9fafb' : '#ffffff'}; border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 12px 16px; color: #6b7280; font-size: 12px; font-weight: 500;">${index + 1}</td>
+                <td style="padding: 12px 16px; font-weight: 600; color: #111827;">
+                    ${sale.productName}
+                    ${sale.grade ? `<span style="display: inline-block; background-color: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 8px; font-weight: bold; color: #4b5563; text-transform: uppercase;">${sale.grade}</span>` : ''}
+                </td>
+                <td style="padding: 12px 16px; color: #4b5563;">${sale.productType}</td>
+                <td style="padding: 12px 16px; text-align: center;">
+                    <span style="background-color: #f3f4f6; color: #374151; padding: 4px 10px; border-radius: 99px; font-size: 12px; font-weight: 700;">
+                        ${sale.quantity} ${sale.productType === 'Flower' ? 'g' : 'u'}
+                    </span>
+                </td>
+                <td style="padding: 12px 16px; text-align: right; font-weight: 700; font-family: monospace; color: #111827;">${formatCurrency(sale.price)}</td>
+            </tr>
+          `;
+      }).join('');
+
+      // Expenses Table
+      const expensesHtml = expenses.length > 0 ? `
+        <div style="margin-top: 40px;">
+            <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; color: #b91c1c; margin-bottom: 15px; border-bottom: 2px solid #b91c1c; padding-bottom: 8px; display: inline-block;">
+                Expenses & Deductions
+            </h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <thead>
+                    <tr style="background-color: #fef2f2; border-bottom: 1px solid #fee2e2;">
+                        <th style="text-align: left; padding: 12px; color: #991b1b; font-weight: 700; text-transform: uppercase;">Description</th>
+                        <th style="text-align: right; padding: 12px; color: #991b1b; font-weight: 700; text-transform: uppercase;">Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${expenses.map(exp => `
+                        <tr style="border-bottom: 1px dashed #e5e7eb;">
+                            <td style="padding: 12px; color: #374151; font-weight: 500;">${exp.description}</td>
+                            <td style="padding: 12px; text-align: right; font-family: monospace; color: #dc2626; font-weight: 800;">-${formatCurrency(exp.amount)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+      ` : '';
+
+      printContainer.innerHTML = `
+        <!-- HEADER -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 4px solid #111827; padding-bottom: 30px;">
+            <div>
+                <h1 style="font-size: 48px; font-weight: 900; letter-spacing: -0.02em; margin: 0; color: #111827; line-height: 1;">${shopName}</h1>
+                <div style="display: flex; align-items: center; margin-top: 12px;">
+                    <div style="background-color: #111827; color: white; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-right: 12px;">Daily Sales Report</div>
+                    <div style="color: #6b7280; font-size: 14px; font-weight: 500;">Authorized by: ${staffName}</div>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 28px; font-weight: 800; color: #111827;">${dateStr}</div>
+                <div style="font-size: 14px; color: #6b7280; margin-top: 4px; font-weight: 500;">Generated at ${timeStr}</div>
+            </div>
+        </div>
+
+        <!-- KPI CARDS -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 40px;">
+            <!-- Revenue Card -->
+            <div style="background-color: #111827; color: white; padding: 24px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+                <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; font-weight: 700;">Total Revenue</div>
+                <div style="font-size: 36px; font-weight: 800; margin-top: 8px;">${formatCurrency(totalRevenue)}</div>
+            </div>
+            
+            <!-- Items Card -->
+            <div style="background-color: #ffffff; border: 1px solid #e5e7eb; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; font-weight: 700;">Items Sold</div>
+                <div style="font-size: 36px; font-weight: 800; color: #111827; margin-top: 8px;">${sales.length}</div>
+            </div>
+
+            <!-- Expenses Card -->
+            <div style="background-color: #fff1f2; border: 1px solid #fda4af; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: #be123c; font-weight: 700;">Total Expenses</div>
+                <div style="font-size: 36px; font-weight: 800; color: #be123c; margin-top: 8px;">-${formatCurrency(totalExpenses)}</div>
+            </div>
+        </div>
+
+        <!-- SALES TABLE -->
+        <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; color: #111827; margin-bottom: 15px; border-bottom: 2px solid #111827; padding-bottom: 8px; display: inline-block;">
+            Detailed Transactions
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px; border: 1px solid #e5e7eb;">
+            <thead>
+                <tr style="background-color: #f3f4f6; border-bottom: 2px solid #e5e7eb;">
+                    <th style="text-align: left; padding: 12px 16px; color: #374151; font-weight: 700; text-transform: uppercase; width: 40px;">#</th>
+                    <th style="text-align: left; padding: 12px 16px; color: #374151; font-weight: 700; text-transform: uppercase;">Product Name</th>
+                    <th style="text-align: left; padding: 12px 16px; color: #374151; font-weight: 700; text-transform: uppercase;">Type</th>
+                    <th style="text-align: center; padding: 12px 16px; color: #374151; font-weight: 700; text-transform: uppercase; width: 100px;">Qty</th>
+                    <th style="text-align: right; padding: 12px 16px; color: #374151; font-weight: 700; text-transform: uppercase; width: 120px;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${salesRowsHtml}
+            </tbody>
+        </table>
+
+        <!-- EXPENSES -->
+        ${expensesHtml}
+
+        <!-- NET TOTAL FOOTER -->
+        <div style="margin-top: 50px; padding-top: 30px; border-top: 3px dashed #d1d5db; display: flex; justify-content: flex-end;">
+            <div style="text-align: right; background-color: #f0fdf4; padding: 20px 40px; border-radius: 12px; border: 1px solid #bbf7d0;">
+                <div style="font-size: 14px; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Net Profit (Estimated)</div>
+                <div style="font-size: 42px; font-weight: 900; color: #15803d; line-height: 1.2;">${formatCurrency(netProfit)}</div>
+            </div>
+        </div>
+
+        <div style="margin-top: 80px; text-align: center; font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 3px; font-weight: 500;">
+            End of Report • Generated by The Green Spot POS System
+        </div>
+      `;
+
+      // 4. Append, Capture, and Generate
+      document.body.appendChild(printContainer);
+
+      const canvas = await html2canvas(printContainer, {
+        scale: 2, // 2x for Retina quality
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+
+      // Cleanup DOM
+      document.body.removeChild(printContainer);
+
+      // Create PDF
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -177,9 +319,11 @@ export const DailyReport: React.FC<DailyReportProps> = ({
       let heightLeft = imgHeight;
       let position = 0;
 
+      // Add first page
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pdfHeight;
 
+      // Add subsequent pages if content is long
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
@@ -191,7 +335,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({
 
     } catch (error) {
       console.error("PDF Generation failed", error);
-      alert("Failed to generate PDF");
+      alert("Failed to generate PDF. Please try again.");
     } finally {
       setDownloadingPdf(false);
     }
