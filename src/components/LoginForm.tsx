@@ -48,15 +48,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
             onLogin('greenspot', true, 'Super Admin'); // Admin starts at greenspot but can switch
             return;
         }
-        // Fallback: Allow Nyein/Kevin to use 0000 as well if needed
-        if (user === 'nyein') {
-             onLogin('greenspot', false, 'Staff 1 (Nyein)');
-             return;
-        }
-        if (user === 'kevin') {
-             onLogin('greenspot', false, 'Staff 2 (Kevin)');
-             return;
-        }
     }
 
     setError("Invalid username or password.");

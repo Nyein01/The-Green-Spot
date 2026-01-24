@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProductType, FlowerGrade, InventoryItem, SaleItem } from '../types';
 import { calculateFlowerPrice, formatCurrency, generateId } from '../utils/pricing';
-import { ShoppingCart, Tag, AlertCircle, Search, X, ChevronDown, Check, Loader2, PartyPopper, Banknote, QrCode } from 'lucide-react';
+import { ShoppingCart, Tag, AlertCircle, Search, X, ChevronDown, Check, Loader2, PartyPopper, Banknote, QrCode, Flame, Trophy } from 'lucide-react';
 
 interface SalesFormProps {
   inventory: InventoryItem[];
@@ -20,6 +20,11 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   const [price, setPrice] = useState<number>(0);
   const [isAutoPrice, setIsAutoPrice] = useState<boolean>(true);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Scan'>('Cash');
+  
+  // Cool Features State
+  const [streak, setStreak] = useState(0);
+  const [showNice, setShowNice] = useState(false);
+  const [showWhale, setShowWhale] = useState(false);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -69,6 +74,19 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
     e.preventDefault();
 
     if (!selectedStrain) return alert("Please select a product.");
+
+    // Gamification Triggers
+    setStreak(prev => prev + 1);
+
+    if (price === 420) {
+        setShowNice(true);
+        setTimeout(() => setShowNice(false), 2500);
+    }
+
+    if (price >= 2000) {
+        setShowWhale(true);
+        setTimeout(() => setShowWhale(false), 3000);
+    }
 
     // Recalculate original price for data integrity
     let originalPrice = 0;
@@ -122,16 +140,47 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   const visibleTypes = Object.values(ProductType).filter(t => t !== ProductType.OTHER);
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors animate-fade-in relative">
-      <h2 className="text-xl font-bold mb-4 flex items-center justify-between text-gray-800 dark:text-gray-100">
-        <div className="flex items-center">
+    <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors animate-fade-in relative overflow-hidden">
+      
+      {/* 420 Overlay */}
+      {showNice && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
+              <div className="text-center animate-bounce">
+                  <h1 className="text-8xl font-black text-green-500 drop-shadow-[0_0_15px_rgba(34,197,94,0.8)]">420</h1>
+                  <p className="text-white text-2xl font-bold uppercase tracking-widest mt-4">Nice.</p>
+              </div>
+          </div>
+      )}
+
+      {/* Whale Alert Overlay */}
+      {showWhale && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-900/80 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
+              <div className="text-center">
+                  <div className="text-9xl animate-pulse">🐋</div>
+                  <h1 className="text-4xl font-black text-white mt-4">WHALE ALERT!</h1>
+                  <p className="text-blue-200 text-xl font-bold uppercase tracking-widest mt-2">Big Spender Detected</p>
+                  <p className="text-white font-mono text-3xl mt-4 bg-blue-800 inline-block px-4 py-2 rounded-lg border border-blue-400">{formatCurrency(price)}</p>
+              </div>
+          </div>
+      )}
+
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold flex items-center text-gray-800 dark:text-gray-100">
             <ShoppingCart className="w-5 h-5 mr-2 text-green-600 dark:text-green-500" />
             New Sale
+        </h2>
+        <div className="flex items-center space-x-2">
+            {streak > 1 && (
+                <div className="flex items-center px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-lg text-xs font-bold animate-pulse">
+                    <Flame className="w-3 h-3 mr-1" />
+                    Hot Streak: {streak}
+                </div>
+            )}
+            <span className="text-xs font-normal text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
+                Staff: {staffName}
+            </span>
         </div>
-        <span className="text-xs font-normal text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
-            Staff: {staffName}
-        </span>
-      </h2>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Product Type Selection */}
@@ -299,7 +348,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                   : 'bg-white dark:bg-gray-800 border-blue-300 dark:border-blue-500 text-blue-600 dark:text-blue-400 focus:ring-blue-500 shadow-inner'
               }`}
             />
-            {price === 420 && (
+            {price === 420 && !showNice && (
                 <div className="absolute right-3 animate-bounce">
                     <span className="text-lg">🌿</span>
                 </div>
@@ -308,7 +357,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
           {price === 420 ? (
              <p className="text-xs font-bold text-green-600 dark:text-green-400 mt-1 flex items-center animate-pulse">
                 <PartyPopper className="w-3 h-3 mr-1" />
-                Nice.
+                Perfect.
              </p>
           ) : !isAutoPrice && (
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center animate-pulse">
@@ -352,8 +401,9 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
         <button
           type="submit"
           disabled={!selectedStrain}
-          className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:scale-95 touch-manipulation disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
+          className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:scale-95 touch-manipulation disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed flex items-center justify-center"
         >
+          {streak > 2 ? <Flame className="w-5 h-5 mr-2 animate-bounce" /> : null}
           Confirm Sale
         </button>
       </form>

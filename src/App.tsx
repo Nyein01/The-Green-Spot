@@ -21,7 +21,8 @@ import {
   Loader2,
   UserCircle2,
   Banknote,
-  QrCode
+  QrCode,
+  Terminal
 } from 'lucide-react';
 import { LoginForm } from './components/LoginForm';
 import { SalesForm } from './components/SalesForm';
@@ -69,6 +70,7 @@ const App: React.FC = () => {
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isMatrixMode, setIsMatrixMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
@@ -81,10 +83,17 @@ const App: React.FC = () => {
   useEffect(() => {
     // Check local storage for theme preference on mount
     const savedTheme = localStorage.getItem('greentrack_theme');
+    const savedMatrix = localStorage.getItem('greentrack_matrix');
+    
     if (savedTheme === 'dark') {
       setIsDarkMode(true);
     } else if (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setIsDarkMode(true);
+    }
+    
+    if (savedMatrix === 'true') {
+        setIsMatrixMode(true);
+        setIsDarkMode(true); // Matrix implies dark mode
     }
   }, []);
 
@@ -119,7 +128,18 @@ const App: React.FC = () => {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
     localStorage.setItem('greentrack_theme', newMode ? 'dark' : 'light');
+    if (!newMode) setIsMatrixMode(false); // Disable matrix if going to light mode
   };
+
+  const toggleMatrixMode = () => {
+      const newMatrix = !isMatrixMode;
+      setIsMatrixMode(newMatrix);
+      localStorage.setItem('greentrack_matrix', newMatrix ? 'true' : 'false');
+      if (newMatrix) {
+          setIsDarkMode(true);
+          localStorage.setItem('greentrack_theme', 'dark');
+      }
+  }
 
   const handleNewSale = async (sale: SaleItem) => {
     if (!isOnline) return alert("⚠️ You are offline.");
@@ -277,6 +297,27 @@ const App: React.FC = () => {
           <div className={`max-w-md mx-auto bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm pb-20 dark:border-gray-700 border ${contentClass}`}>
             <h2 className="text-xl font-bold mb-6 dark:text-white">System Settings</h2>
             <div className="space-y-4">
+              
+              {/* Cool Feature: Matrix Mode Toggle */}
+              <button 
+                  onClick={toggleMatrixMode} 
+                  className={`group w-full flex items-center justify-between p-4 rounded-lg border transition-all ${
+                      isMatrixMode 
+                      ? 'bg-black border-green-500 text-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' 
+                      : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200'
+                  }`}
+              >
+                  <div className="flex items-center">
+                    <Terminal className="w-5 h-5 mr-3" />
+                    <span className={isMatrixMode ? 'font-mono uppercase tracking-widest' : 'font-medium'}>
+                        {isMatrixMode ? 'Matrix Mode: ACTIVE' : 'Matrix Mode'}
+                    </span>
+                  </div>
+                  <div className={`w-10 h-5 rounded-full relative transition-colors ${isMatrixMode ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                      <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${isMatrixMode ? 'translate-x-5' : ''}`}></div>
+                  </div>
+              </button>
+
               <div className={`p-4 rounded-lg border transition-all duration-500 ${
                 isOnline 
                   ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800' 
@@ -323,6 +364,44 @@ const App: React.FC = () => {
 
   return (
     <div className={`${isDarkMode ? 'dark' : ''}`}>
+      {isMatrixMode && (
+          <style>{`
+            :root {
+                --matrix-green: #00ff41;
+                --matrix-black: #0d0208;
+                --matrix-dark-green: #003b00;
+            }
+            body, .dark, .bg-white, .bg-gray-50, .bg-gray-100, .bg-gray-800, .bg-gray-900 {
+                background-color: black !important;
+                color: var(--matrix-green) !important;
+                font-family: 'Courier New', Courier, monospace !important;
+            }
+            .border, .border-gray-100, .border-gray-200, .border-gray-700 {
+                border-color: var(--matrix-green) !important;
+                border-width: 1px !important;
+                border-radius: 0px !important;
+            }
+            .rounded-xl, .rounded-lg, .rounded-md, .rounded-full {
+                border-radius: 0px !important;
+            }
+            button, input, select {
+                border: 1px solid var(--matrix-green) !important;
+                background: black !important;
+                color: var(--matrix-green) !important;
+                box-shadow: none !important;
+            }
+            button:hover {
+                background: var(--matrix-green) !important;
+                color: black !important;
+            }
+            input::placeholder {
+                color: #008f11 !important;
+            }
+            .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl {
+                box-shadow: 0 0 5px var(--matrix-green) !important;
+            }
+          `}</style>
+      )}
       <style>{`
         @keyframes slideInUp {
           from { opacity: 0; transform: translateY(15px); }
