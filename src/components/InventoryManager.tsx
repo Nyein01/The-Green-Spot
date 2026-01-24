@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { InventoryItem, ProductType, FlowerGrade } from '../types';
 import { Plus, Edit2, Save, X, ClipboardList, Minus, ShoppingCart, ArrowLeft, FileSpreadsheet, FileText, Loader2, ChevronUp, ChevronDown, ArrowUpDown, Leaf, Flame, Utensils, Zap, Package, Search, Lock, Trash2, CheckCircle2 } from 'lucide-react';
 import { generateId } from '../utils/pricing';
+import { generateInventoryAnalysis } from '../services/geminiService';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -163,8 +164,6 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
   };
 
   const handleExportPDF = async () => {
-    const element = document.getElementById('inventory-table-container');
-    if (!element) return;
     if (inventory.length === 0) {
       alert("Inventory is empty.");
       return;
@@ -173,79 +172,120 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
     setIsExportingPDF(true);
 
     try {
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        backgroundColor: '#000000', // Pure black background
-        logging: false,
-        useCORS: true,
-        onclone: (clonedDoc) => {
-          const container = clonedDoc.getElementById('inventory-table-container');
-          if (container) {
-            container.style.maxHeight = 'none';
-            container.style.overflow = 'visible';
-            container.style.backgroundColor = '#000000';
-            container.style.color = '#ffffff';
-            container.style.padding = '20px';
+      // 1. Get AI Summary
+      const aiSummary = await generateInventoryAnalysis(inventory);
 
-            // Show and style the header for black background
-            const header = container.querySelector('.hidden.print\\:block');
-            if (header) {
-                (header as HTMLElement).classList.remove('hidden');
-                (header as HTMLElement).style.display = 'block';
-                (header as HTMLElement).style.backgroundColor = '#000000';
-                (header as HTMLElement).style.borderBottom = '2px solid #22c55e';
-                
-                const h1 = header.querySelector('h1');
-                if (h1) {
-                    h1.style.color = '#ffffff';
-                    h1.classList.remove('text-gray-800');
-                }
-                
-                const p = header.querySelector('p');
-                if (p) {
-                    p.style.color = '#a3a3a3';
-                    p.classList.remove('text-gray-500');
-                }
-            }
+      // 2. Create an invisible container on the DOM to act as our "Paper"
+      // We do this to ensure it renders at desktop width even on mobile phones.
+      const printContainer = document.createElement('div');
+      printContainer.id = 'pdf-print-container';
+      printContainer.style.position = 'fixed';
+      printContainer.style.top = '-9999px';
+      printContainer.style.left = '0';
+      printContainer.style.width = '1200px'; // Force wide layout
+      printContainer.style.backgroundColor = '#ffffff';
+      printContainer.style.fontFamily = 'Inter, sans-serif';
+      printContainer.style.color = '#000000'; // FORCE BLACK TEXT
+      printContainer.style.padding = '40px';
+      
+      // 3. Build the HTML String for the report
+      let tableRows = '';
+      
+      Object.entries(groupedInventory).forEach(([category, items]) => {
+         const invItems = items as InventoryItem[];
+         if (invItems.length === 0) return;
 
-            // Force text colors to white/light gray
-            const allText = container.querySelectorAll('*');
-            allText.forEach((el) => {
-                const style = window.getComputedStyle(el);
-                // If text is dark (default), make it light
-                if (style.color === 'rgb(0, 0, 0)' || style.color === 'rgb(31, 41, 55)' || style.color === 'rgb(55, 65, 81)' || style.color === 'rgb(17, 24, 39)') {
-                    (el as HTMLElement).style.color = '#e5e5e5';
-                }
-                
-                // Specifically target common tailwind text classes if computed style check isn't enough
-                if (el.classList.contains('text-gray-900') || el.classList.contains('text-gray-800') || el.classList.contains('text-gray-700')) {
-                   (el as HTMLElement).style.color = '#ffffff';
-                }
-                if (el.classList.contains('text-gray-500')) {
-                   (el as HTMLElement).style.color = '#a3a3a3';
-                }
-            });
+         // Category Header - Force Text Color
+         tableRows += `
+            <tr style="background-color: #f0fdf4; border-bottom: 2px solid #22c55e;">
+                <td colspan="4" style="padding: 12px; font-weight: 800; text-transform: uppercase; font-size: 14px; color: #166534;">
+                    ${category} (${invItems.length})
+                </td>
+            </tr>
+         `;
 
-            // Darken table headers
-            const thead = container.querySelector('thead');
-            if (thead) {
-                (thead as HTMLElement).style.backgroundColor = '#111111';
-                (thead as HTMLElement).style.color = '#ffffff';
-            }
-            
-            // Fix rows hover/backgrounds if any
-            const rows = container.querySelectorAll('tr');
-            rows.forEach(row => {
-                row.style.backgroundColor = 'transparent';
-                row.style.borderBottomColor = '#333333';
-            });
-
-            const actions = clonedDoc.querySelectorAll('[data-pdf-hide]');
-            actions.forEach(el => (el as HTMLElement).style.display = 'none');
-          }
-        }
+         // Items
+         invItems.forEach((item, index) => {
+             const rowBg = index % 2 === 0 ? '#ffffff' : '#f9fafb';
+             const stockColor = item.stockLevel <= 5 ? '#dc2626' : '#374151'; // Red if low, Dark Gray otherwise
+             
+             // STRICTLY ENFORCE COLOR ON TD TO OVERRIDE ANY DARK MODE INHERITANCE
+             tableRows += `
+                <tr style="background-color: ${rowBg}; border-bottom: 1px solid #e5e7eb;">
+                    <td style="padding: 12px; font-weight: 600; color: #111827;">${item.name}</td>
+                    <td style="padding: 12px; color: #6b7280; font-size: 12px;">${item.category}</td>
+                    <td style="padding: 12px; color: #374151;">
+                        ${item.grade 
+                            ? `<span style="background-color: #e5e7eb; padding: 4px 8px; border-radius: 99px; font-size: 10px; font-weight: bold; text-transform: uppercase; color: #374151;">${item.grade}</span>` 
+                            : item.price 
+                                ? `<span style="font-family: monospace; color: #374151;">${item.price} THB</span>`
+                                : '-'
+                        }
+                    </td>
+                    <td style="padding: 12px; font-family: monospace; font-size: 14px; font-weight: bold; color: ${stockColor};">
+                        ${item.stockLevel}
+                    </td>
+                </tr>
+             `;
+         });
       });
 
+      printContainer.innerHTML = `
+        <div style="margin-bottom: 30px; border-bottom: 4px solid #22c55e; padding-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: end;">
+                <div>
+                    <h1 style="font-size: 32px; font-weight: 900; margin: 0; color: #111827; text-transform: uppercase;">${shopName}</h1>
+                    <p style="margin: 4px 0 0 0; color: #6b7280; letter-spacing: 0.1em; text-transform: uppercase; font-size: 12px;">Inventory Status Report</p>
+                </div>
+                <div style="text-align: right;">
+                    <p style="margin: 0; font-size: 14px; font-weight: bold; color: #111827;">${new Date().toLocaleDateString()}</p>
+                    <p style="margin: 0; font-size: 12px; color: #9ca3af;">Generated by AI POS</p>
+                </div>
+            </div>
+        </div>
+
+        <div style="background-color: #f3f4f6; padding: 20px; border-radius: 12px; margin-bottom: 30px; border: 1px solid #e5e7eb;">
+            <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: #4b5563; text-transform: uppercase; display: flex; align-items: center;">
+                <span style="background-color: #4f46e5; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; margin-right: 8px;">AI Summary</span>
+                Executive Overview
+            </h3>
+            <p style="margin: 0; font-size: 14px; color: #374151; line-height: 1.5; font-style: italic;">
+                "${aiSummary}"
+            </p>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+            <thead>
+                <tr style="background-color: #111827; color: white;">
+                    <th style="padding: 12px; font-weight: 600; border-top-left-radius: 8px; color: #ffffff;">Product</th>
+                    <th style="padding: 12px; font-weight: 600; color: #ffffff;">Type</th>
+                    <th style="padding: 12px; font-weight: 600; color: #ffffff;">Details</th>
+                    <th style="padding: 12px; font-weight: 600; border-top-right-radius: 8px; color: #ffffff;">Stock Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRows}
+            </tbody>
+        </table>
+        
+        <div style="margin-top: 40px; text-align: center; color: #d1d5db; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
+            End of Report • Internal Use Only
+        </div>
+      `;
+
+      document.body.appendChild(printContainer);
+
+      // 4. Capture the High-Res Image of the "Desktop" container
+      const canvas = await html2canvas(printContainer, {
+        scale: 2, // Retina quality
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+
+      // 5. Remove the temporary container
+      document.body.removeChild(printContainer);
+
+      // 6. Create PDF
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -261,30 +301,22 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
       let heightLeft = imgHeight;
       let position = 0;
 
-      // Fill PDF background with black
-      pdf.setFillColor(0, 0, 0);
-      pdf.rect(0, 0, pdfWidth, pdfHeight, 'F');
-
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pdfHeight;
 
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
-        // Fill new page background
-        pdf.setFillColor(0, 0, 0);
-        pdf.rect(0, 0, pdfWidth, pdfHeight, 'F');
-        
         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
         heightLeft -= pdfHeight;
       }
 
-      const fileName = `${shopName.replace(/\s+/g, '')}_Inventory_${showOrderList ? 'Orders_' : ''}${new Date().toISOString().split('T')[0]}.pdf`;
+      const fileName = `${shopName.replace(/\s+/g, '')}_Inventory_${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(fileName);
 
     } catch (error) {
       console.error("PDF Generation failed", error);
-      alert("Failed to generate PDF");
+      alert("Failed to generate PDF. Please try again.");
     } finally {
       setIsExportingPDF(false);
     }
@@ -391,7 +423,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                 title="Download Inventory as PDF"
                 >
                 {isExportingPDF ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileText className="w-3 h-3 mr-1" />} 
-                PDF
+                PDF + AI
                 </button>
                 <button 
                 onClick={handleExportCSV}
@@ -490,12 +522,6 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
       )}
 
       <div className="overflow-x-auto" id="inventory-table-container">
-        {/* PDF Header (Only visible when captured, styled to be white text on black for PDF in onclone) */}
-        <div className="hidden print:block p-8 border-b-2 border-green-600 mb-6">
-           <h1 className="text-3xl font-black text-gray-800 uppercase tracking-widest">{shopName}</h1>
-           <p className="text-gray-500 font-mono text-sm uppercase">Inventory Status Report • {new Date().toLocaleDateString()}</p>
-        </div>
-
         <table className="w-full text-sm text-left bg-transparent">
           <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700/50 sticky top-0 z-10 backdrop-blur-sm">
             <tr>

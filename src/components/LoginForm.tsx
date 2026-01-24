@@ -22,7 +22,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     const user = username.toLowerCase().trim();
     const pass = password.trim();
 
-    if (pass === '1234') { 
+    if (pass === '0000') { 
         // Staff Profiles for The Green Spot
         if (user === 'nyein') {
             onLogin('greenspot', false, 'Staff 1 (Nyein)');

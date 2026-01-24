@@ -57,3 +57,35 @@ export const generateSalesAnalysis = async (
     return "Error generating AI analysis. Please check your connection or API key.";
   }
 };
+
+export const generateInventoryAnalysis = async (inventory: InventoryItem[]): Promise<string> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    const lowStock = inventory.filter(i => i.stockLevel < 15);
+    const totalValue = inventory.length; // Simplified value, just count items
+    const categories = [...new Set(inventory.map(i => i.category))];
+
+    const prompt = `
+      You are an Inventory Manager. Write a very short, 2-3 sentence executive summary for a PDF report.
+      
+      Data:
+      - Total SKUs: ${totalValue}
+      - Low Stock Items: ${lowStock.length} (${lowStock.map(i => i.name).join(', ')})
+      - Categories: ${categories.join(', ')}
+
+      Write it in a professional, formal tone suitable for a printed document. 
+      If low stock is high, express urgency. If stock is good, express stability.
+      Do NOT use markdown. Just plain text.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+    });
+
+    return response.text || "Inventory status generated.";
+  } catch (error) {
+    return "Inventory Report generated automatically by The Green Spot POS.";
+  }
+};

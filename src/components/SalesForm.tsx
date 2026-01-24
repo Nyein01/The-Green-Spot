@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProductType, FlowerGrade, InventoryItem, SaleItem } from '../types';
 import { calculateFlowerPrice, formatCurrency, generateId } from '../utils/pricing';
-import { ShoppingCart, Tag, AlertCircle, Search, X, ChevronDown, Check } from 'lucide-react';
+import { ShoppingCart, Tag, AlertCircle, Search, X, ChevronDown, Check, Loader2, PartyPopper } from 'lucide-react';
 
 interface SalesFormProps {
   inventory: InventoryItem[];
@@ -119,7 +119,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   const visibleTypes = Object.values(ProductType).filter(t => t !== ProductType.OTHER);
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors animate-fade-in">
+    <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors animate-fade-in relative">
       <h2 className="text-xl font-bold mb-4 flex items-center justify-between text-gray-800 dark:text-gray-100">
         <div className="flex items-center">
             <ShoppingCart className="w-5 h-5 mr-2 text-green-600 dark:text-green-500" />
@@ -296,8 +296,18 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                   : 'bg-white dark:bg-gray-800 border-blue-300 dark:border-blue-500 text-blue-600 dark:text-blue-400 focus:ring-blue-500 shadow-inner'
               }`}
             />
+            {price === 420 && (
+                <div className="absolute right-3 animate-bounce">
+                    <span className="text-lg">🌿</span>
+                </div>
+            )}
           </div>
-          {!isAutoPrice && (
+          {price === 420 ? (
+             <p className="text-xs font-bold text-green-600 dark:text-green-400 mt-1 flex items-center animate-pulse">
+                <PartyPopper className="w-3 h-3 mr-1" />
+                Nice.
+             </p>
+          ) : !isAutoPrice && (
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center animate-pulse">
               <AlertCircle className="w-3 h-3 mr-1" />
               Price manually adjusted
