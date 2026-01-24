@@ -24,8 +24,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
 
     if (pass === '1234') { 
         // Staff Profiles for The Green Spot
-        if (user === 'davin') {
-            onLogin('greenspot', false, 'Staff 1 (Davin)');
+        if (user === 'nyein') {
+            onLogin('greenspot', false, 'Staff 1 (Nyein)');
             return;
         }
         if (user === 'kevin') {
@@ -84,7 +84,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   className="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-gray-600 rounded-xl dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all bg-gray-50 dark:bg-gray-800 focus:bg-white dark:focus:bg-gray-700"
-                  placeholder="e.g., davin, kevin"
+                  placeholder="e.g., nyein, kevin"
                 />
               </div>
             </div>
@@ -123,12 +123,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
                 </>
               )}
             </button>
-            
-            <div className="text-center">
-                <p className="text-xs text-gray-400">
-                    Use <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">davin</span> or <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">kevin</span> to login.
-                </p>
-            </div>
           </form>
         </div>
       </div>

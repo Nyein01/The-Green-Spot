@@ -246,7 +246,7 @@ const App: React.FC = () => {
                 {sales.map((sale, idx) => (
                   <div key={sale.id} className={`p-4 flex justify-between items-center ${deletingIds.has(sale.id) ? 'opacity-0 scale-95' : 'opacity-100'} transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50`} style={{ animationDelay: `${idx * 50}ms` }}>
                     <div>
-                      <div className="font-medium dark:text-gray-200">{sale.productName}</div>
+                      <div className="font-medium text-gray-800 dark:text-gray-200">{sale.productName}</div>
                       <div className="text-xs text-gray-500">{new Date(sale.timestamp).toLocaleTimeString()} • {sale.quantity} {sale.productType === 'Flower' ? 'g' : 'units'}</div>
                     </div>
                     <div className="font-bold text-green-600">+{sale.price} ฿</div>
