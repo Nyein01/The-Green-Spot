@@ -1,33 +1,27 @@
 import React, { useMemo } from 'react';
-import { SaleItem, InventoryItem, DayReport } from '../types';
+import { InventoryItem, DayReport } from '../types';
 import { formatCurrency } from '../utils/pricing';
 import { 
   TrendingUp, 
   Award, 
   Calendar, 
-  Package
+  Package,
+  Archive
 } from 'lucide-react';
 
 interface HistoricalReportProps {
-  liveSales: SaleItem[];
-  archivedReports: DayReport[]; // Added archived reports source
+  archivedReports: DayReport[];
   inventory: InventoryItem[];
   timeframe: 'weekly' | 'monthly';
   shopName: string;
 }
 
-export const HistoricalReport: React.FC<HistoricalReportProps> = ({ liveSales, archivedReports, inventory, timeframe, shopName }) => {
+export const HistoricalReport: React.FC<HistoricalReportProps> = ({ archivedReports, inventory, timeframe, shopName }) => {
   
-  // Combine Live Sales with Archived Sales from Reports to get the full picture
+  // STRICTLY use Archived Sales from Reports (Closed Shifts)
   const allSales = useMemo(() => {
-      // Extract sales from archived reports
-      const archivedSales = archivedReports.flatMap(report => report.sales);
-      
-      // Combine with live sales (filtering out duplicates just in case, though logically shouldn't overlap if workflow is followed)
-      // A simple concat is usually fine if we assume 'liveSales' are strictly newer than archived ones.
-      // However, let's just combine them.
-      return [...liveSales, ...archivedSales];
-  }, [liveSales, archivedReports]);
+      return archivedReports.flatMap(report => report.sales);
+  }, [archivedReports]);
 
   // Filter sales based on timeframe
   const filteredSales = useMemo(() => {
@@ -75,6 +69,17 @@ export const HistoricalReport: React.FC<HistoricalReportProps> = ({ liveSales, a
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
+      <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center">
+             {timeframe === 'weekly' ? <TrendingUp className="w-6 h-6 mr-2 text-indigo-500" /> : <Calendar className="w-6 h-6 mr-2 text-purple-500" />}
+             {timeframe === 'weekly' ? 'Weekly Highlights' : 'Monthly Summary'}
+          </h2>
+          <span className="text-xs font-semibold text-gray-500 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 px-3 py-1 rounded-full flex items-center">
+             <Archive className="w-3 h-3 mr-1" />
+             Source: Archived Reports
+          </span>
+      </div>
+
       {/* Header Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className={`bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border-l-4 border-${accentColor}-500 flex items-center`}>
@@ -122,7 +127,7 @@ export const HistoricalReport: React.FC<HistoricalReportProps> = ({ liveSales, a
           </div>
           <div className="divide-y divide-gray-50 dark:divide-gray-700">
             {bestSellers.length === 0 ? (
-              <div className="p-12 text-center text-gray-400 italic">No sales data for this period (including archived reports).</div>
+              <div className="p-12 text-center text-gray-400 italic">No archived sales data for this period.</div>
             ) : (
               bestSellers.map((item, idx) => (
                 <div key={item.name} className="p-4 flex items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group">

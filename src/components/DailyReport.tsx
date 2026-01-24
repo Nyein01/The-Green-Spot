@@ -15,7 +15,9 @@ import {
   LogOut,
   Coins,
   Wallet,
-  Plus
+  Plus,
+  Banknote,
+  QrCode
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
@@ -243,7 +245,14 @@ export const DailyReport: React.FC<DailyReportProps> = ({
                   <div className="flex items-start">
                     <span className="text-gray-300 mr-3 text-xs w-4 font-mono">{idx + 1}.</span>
                     <div>
-                      <div className="font-bold text-gray-800 text-base">{sale.productName}</div>
+                      <div className="font-bold text-gray-800 text-base flex items-center">
+                        {sale.productName}
+                        {sale.paymentMethod === 'Scan' ? (
+                            <QrCode className="w-3 h-3 ml-2 text-blue-500" />
+                        ) : (
+                            <Banknote className="w-3 h-3 ml-2 text-green-500" />
+                        )}
+                      </div>
                       <div className="text-xs text-gray-500 flex items-center mt-0.5">
                         <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px]">
                           {sale.quantity}{sale.productType === 'Flower' ? 'g' : ' units'}

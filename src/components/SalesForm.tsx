@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProductType, FlowerGrade, InventoryItem, SaleItem } from '../types';
 import { calculateFlowerPrice, formatCurrency, generateId } from '../utils/pricing';
-import { ShoppingCart, Tag, AlertCircle, Search, X, ChevronDown, Check, Loader2, PartyPopper } from 'lucide-react';
+import { ShoppingCart, Tag, AlertCircle, Search, X, ChevronDown, Check, Loader2, PartyPopper, Banknote, QrCode } from 'lucide-react';
 
 interface SalesFormProps {
   inventory: InventoryItem[];
@@ -19,6 +19,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   const [quantity, setQuantity] = useState<number>(1);
   const [price, setPrice] = useState<number>(0);
   const [isAutoPrice, setIsAutoPrice] = useState<boolean>(true);
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Scan'>('Cash');
   
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -89,7 +90,8 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
       price: Number(price),
       originalPrice,
       isNegotiated: !isAutoPrice,
-      staffName: staffName
+      staffName: staffName,
+      paymentMethod: paymentMethod
     };
 
     onSaleComplete(sale);
@@ -100,6 +102,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
     setSearchQuery('');
     setSelectedStrain('');
     setIsDropdownOpen(false);
+    setPaymentMethod('Cash'); // Reset to default
   };
 
   const handleTypeChange = (type: ProductType) => {
@@ -313,6 +316,37 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
               Price manually adjusted
             </p>
           )}
+        </div>
+
+        {/* Payment Method Selector */}
+        <div className="animate-in fade-in slide-in-from-left-2 duration-300 delay-150">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Payment Method</label>
+            <div className="grid grid-cols-2 gap-3">
+                <button
+                    type="button"
+                    onClick={() => setPaymentMethod('Cash')}
+                    className={`flex items-center justify-center p-3 rounded-lg border transition-all ${
+                        paymentMethod === 'Cash'
+                        ? 'bg-green-100 border-green-500 text-green-800 dark:bg-green-900/40 dark:text-green-300 dark:border-green-600 shadow-md transform scale-[1.02]'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    }`}
+                >
+                    <Banknote className="w-5 h-5 mr-2" />
+                    <span className="font-bold">Cash</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setPaymentMethod('Scan')}
+                    className={`flex items-center justify-center p-3 rounded-lg border transition-all ${
+                        paymentMethod === 'Scan'
+                        ? 'bg-blue-100 border-blue-500 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-600 shadow-md transform scale-[1.02]'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    }`}
+                >
+                    <QrCode className="w-5 h-5 mr-2" />
+                    <span className="font-bold">Scan</span>
+                </button>
+            </div>
         </div>
 
         <button

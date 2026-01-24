@@ -19,7 +19,9 @@ import {
   Library,
   Archive,
   Loader2,
-  UserCircle2
+  UserCircle2,
+  Banknote,
+  QrCode
 } from 'lucide-react';
 import { LoginForm } from './components/LoginForm';
 import { SalesForm } from './components/SalesForm';
@@ -246,7 +248,11 @@ const App: React.FC = () => {
                 {sales.map((sale, idx) => (
                   <div key={sale.id} className={`p-4 flex justify-between items-center ${deletingIds.has(sale.id) ? 'opacity-0 scale-95' : 'opacity-100'} transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50`} style={{ animationDelay: `${idx * 50}ms` }}>
                     <div>
-                      <div className="font-medium text-gray-800 dark:text-gray-200">{sale.productName}</div>
+                      <div className="font-medium text-gray-800 dark:text-gray-200 flex items-center">
+                          {sale.productName}
+                          {sale.paymentMethod === 'Scan' && <QrCode className="w-3 h-3 ml-2 text-blue-400" />}
+                          {sale.paymentMethod === 'Cash' && <Banknote className="w-3 h-3 ml-2 text-green-400" />}
+                      </div>
                       <div className="text-xs text-gray-500">{new Date(sale.timestamp).toLocaleTimeString()} • {sale.quantity} {sale.productType === 'Flower' ? 'g' : 'units'}</div>
                     </div>
                     <div className="font-bold text-green-600">+{sale.price} ฿</div>
@@ -263,9 +269,9 @@ const App: React.FC = () => {
       case Tab.ARCHIVE:
         return <div className={contentClass}><ArchiveView reports={reports} onRestore={handleRestoreReport} onDelete={handleDeleteReport} /></div>;
       case Tab.WEEKLY:
-        return <div className={contentClass}><HistoricalReport liveSales={sales} archivedReports={reports} inventory={inventory} timeframe="weekly" shopName={shopNames[currentShop]} /></div>;
+        return <div className={contentClass}><HistoricalReport archivedReports={reports} inventory={inventory} timeframe="weekly" shopName={shopNames[currentShop]} /></div>;
       case Tab.MONTHLY:
-        return <div className={contentClass}><HistoricalReport liveSales={sales} archivedReports={reports} inventory={inventory} timeframe="monthly" shopName={shopNames[currentShop]} /></div>;
+        return <div className={contentClass}><HistoricalReport archivedReports={reports} inventory={inventory} timeframe="monthly" shopName={shopNames[currentShop]} /></div>;
       case Tab.SETTINGS:
         return (
           <div className={`max-w-md mx-auto bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm pb-20 dark:border-gray-700 border ${contentClass}`}>

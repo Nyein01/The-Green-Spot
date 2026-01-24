@@ -26,6 +26,7 @@ export interface SaleItem {
   isNegotiated: boolean;
   notes?: string;
   staffName?: string; // Added to track who made the sale
+  paymentMethod?: 'Cash' | 'Scan';
 }
 
 export interface InventoryItem {
