@@ -7,14 +7,14 @@ interface SalesFormProps {
   inventory: InventoryItem[];
   onSaleComplete: (sale: SaleItem) => void;
   onStockUpdate: (inventory: InventoryItem[]) => void;
+  staffName: string;
 }
 
-export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete, onStockUpdate }) => {
+export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete, onStockUpdate, staffName }) => {
   const [productType, setProductType] = useState<ProductType>(ProductType.FLOWER);
   const [selectedStrain, setSelectedStrain] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const [customName, setCustomName] = useState<string>('');
   const [grade, setGrade] = useState<FlowerGrade>(FlowerGrade.MID);
   const [quantity, setQuantity] = useState<number>(1);
   const [price, setPrice] = useState<number>(0);
@@ -89,6 +89,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
       price: Number(price),
       originalPrice,
       isNegotiated: !isAutoPrice,
+      staffName: staffName
     };
 
     onSaleComplete(sale);
@@ -119,9 +120,14 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors animate-fade-in">
-      <h2 className="text-xl font-bold mb-4 flex items-center text-gray-800 dark:text-gray-100">
-        <ShoppingCart className="w-5 h-5 mr-2 text-green-600 dark:text-green-500" />
-        New Sale
+      <h2 className="text-xl font-bold mb-4 flex items-center justify-between text-gray-800 dark:text-gray-100">
+        <div className="flex items-center">
+            <ShoppingCart className="w-5 h-5 mr-2 text-green-600 dark:text-green-500" />
+            New Sale
+        </div>
+        <span className="text-xs font-normal text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
+            Staff: {staffName}
+        </span>
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">

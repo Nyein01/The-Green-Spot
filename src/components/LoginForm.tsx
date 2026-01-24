@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Leaf, Lock, User, Loader2 } from 'lucide-react';
+import { Leaf, Lock, User, Loader2, Users } from 'lucide-react';
 
 interface LoginFormProps {
-  onLogin: (shopId: 'greenspot' | 'nearcannabis', isSuperAdmin: boolean) => void;
+  onLogin: (shopId: 'greenspot' | 'nearcannabis', isSuperAdmin: boolean, staffName: string) => void;
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
@@ -23,17 +23,27 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     const pass = password.trim();
 
     if (pass === '1234') { 
-        if (user === 'greenspot') {
-            onLogin('greenspot', false);
+        // Staff Profiles for The Green Spot
+        if (user === 'davin') {
+            onLogin('greenspot', false, 'Staff 1 (Davin)');
             return;
         }
-        // Accept both correct spelling and the specific requested username
+        if (user === 'kevin') {
+            onLogin('greenspot', false, 'Staff 2 (Kevin)');
+            return;
+        }
+        
+        // General Shop Logins
+        if (user === 'greenspot') {
+            onLogin('greenspot', false, 'Manager');
+            return;
+        }
         if (user === 'nearcannabis' || user === 'nearcanabis') {
-            onLogin('nearcannabis', false);
+            onLogin('nearcannabis', false, 'Staff');
             return;
         }
         if (user === 'admin') {
-            onLogin('greenspot', true); // Admin starts at greenspot but can switch
+            onLogin('greenspot', true, 'Super Admin'); // Admin starts at greenspot but can switch
             return;
         }
     }
@@ -74,7 +84,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   className="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-gray-600 rounded-xl dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all bg-gray-50 dark:bg-gray-800 focus:bg-white dark:focus:bg-gray-700"
-                  placeholder="Enter username"
+                  placeholder="e.g., davin, kevin"
                 />
               </div>
             </div>
@@ -104,12 +114,21 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Verifying Credentials...
+                  Verifying...
                 </>
               ) : (
-                'Log In'
+                <>
+                    <Users className="w-5 h-5 mr-2" />
+                    Start Shift
+                </>
               )}
             </button>
+            
+            <div className="text-center">
+                <p className="text-xs text-gray-400">
+                    Use <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">davin</span> or <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">kevin</span> to login.
+                </p>
+            </div>
           </form>
         </div>
       </div>

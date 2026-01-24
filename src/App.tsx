@@ -18,7 +18,8 @@ import {
   BarChart3,
   Library,
   Archive,
-  Loader2
+  Loader2,
+  UserCircle2
 } from 'lucide-react';
 import { LoginForm } from './components/LoginForm';
 import { SalesForm } from './components/SalesForm';
@@ -30,15 +31,24 @@ import {
   subscribeToSales, 
   subscribeToInventory,
   subscribeToReports,
+  subscribeToExpenses,
   addSaleToCloud,
+  addExpenseToCloud,
+  deleteExpenseFromCloud,
   updateInventoryInCloud,
   adjustStockInCloud,
   deleteSaleFromCloud,
+  deleteInventoryItemFromCloud,
   clearSalesInCloud,
+  clearExpensesInCloud,
   migrateLocalToCloud,
-  seedDefaultInventory
+  seedDefaultInventory,
+  saveDayReportToCloud,
+  restoreSalesBatch,
+  deleteReportFromCloud
 } from './services/storageService';
-import { SaleItem, InventoryItem, DayReport, Tab } from './types';
+import { SaleItem, InventoryItem, DayReport, Tab, Expense } from './types';
+import { generateId } from './utils/pricing';
 
 type ShopId = 'greenspot' | 'nearcannabis';
 
@@ -48,10 +58,12 @@ const App: React.FC = () => {
   
   const [activeTab, setActiveTab] = useState<Tab>(Tab.SALES);
   const [currentShop, setCurrentShop] = useState<ShopId>('greenspot');
+  const [currentStaff, setCurrentStaff] = useState<string>('');
   
   const [sales, setSales] = useState<SaleItem[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [reports, setReports] = useState<DayReport[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -85,6 +97,7 @@ const App: React.FC = () => {
 
     const unsubscribeSales = subscribeToSales(currentShop, (data) => setSales(data));
     const unsubscribeInventory = subscribeToInventory(currentShop, (data) => setInventory(data));
+    const unsubscribeExpenses = subscribeToExpenses(currentShop, (data) => setExpenses(data));
     const unsubscribeReports = subscribeToReports(currentShop, (data) => {
         setReports(data);
         setLoading(false);
@@ -94,6 +107,7 @@ const App: React.FC = () => {
       unsubscribeSales();
       unsubscribeInventory();
       unsubscribeReports();
+      unsubscribeExpenses();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -111,6 +125,22 @@ const App: React.FC = () => {
     if (!success) return alert("⚠️ Error saving sale.");
     const item = inventory.find(i => i.name === sale.productName);
     if (item) await adjustStockInCloud(currentShop, item.id, item.stockLevel, -sale.quantity);
+  };
+
+  const handleAddExpense = async (description: string, amount: number) => {
+    if (!isOnline) return alert("Offline: Cannot add expense.");
+    const expense: Expense = {
+        id: generateId(),
+        description,
+        amount,
+        timestamp: Date.now()
+    };
+    await addExpenseToCloud(currentShop, expense);
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!isOnline) return alert("Offline: Cannot delete expense.");
+    await deleteExpenseFromCloud(currentShop, id);
   };
 
   const handleDeleteSale = async (sale: SaleItem) => {
@@ -135,9 +165,39 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDeleteInventory = async (id: string) => {
+    if (!isOnline) return alert("Cannot delete items while offline.");
+    await deleteInventoryItemFromCloud(currentShop, id);
+  }
+
   const handleResetDay = async () => {
     await clearSalesInCloud(currentShop, sales);
+    await clearExpensesInCloud(currentShop, expenses);
   };
+
+  const handleRestoreReport = async (report: DayReport) => {
+      if (!isOnline) return alert("Cannot restore while offline.");
+      if (confirm(`Restore ${report.sales.length} sales from ${new Date(report.date).toLocaleDateString()} to the live register?`)) {
+          const success = await restoreSalesBatch(currentShop, report.sales);
+          if (success) {
+              alert("Sales restored successfully!");
+              setActiveTab(Tab.SALES);
+          } else {
+              alert("Failed to restore sales.");
+          }
+      }
+  };
+
+  const handleDeleteReport = async (reportId: string) => {
+      if (!isOnline) {
+          alert("Cannot delete while offline.");
+          return;
+      }
+      const success = await deleteReportFromCloud(currentShop, reportId);
+      if (!success) {
+          alert("Error: Could not delete report from cloud database.");
+      }
+  }
 
   const handleMigrate = async () => {
     if(confirm("This will upload your local storage data to the cloud database. Continue?")) {
@@ -151,13 +211,20 @@ const App: React.FC = () => {
     alert("Default inventory added!");
   }
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setSales([]); setInventory([]); setReports([]);
-    setCurrentShop('greenspot'); setIsSuperAdmin(false);
+  const handleLogin = (shopId: 'greenspot' | 'nearcannabis', isAdmin: boolean, staffName: string) => {
+    setCurrentShop(shopId);
+    setIsSuperAdmin(isAdmin);
+    setCurrentStaff(staffName);
+    setIsAuthenticated(true);
   }
 
-  if (!isAuthenticated) return <LoginForm onLogin={(shopId, isAdmin) => { setCurrentShop(shopId); setIsSuperAdmin(isAdmin); setIsAuthenticated(true); }} />;
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setSales([]); setInventory([]); setReports([]); setExpenses([]);
+    setCurrentShop('greenspot'); setIsSuperAdmin(false); setCurrentStaff('');
+  }
+
+  if (!isAuthenticated) return <LoginForm onLogin={handleLogin} />;
 
   const renderContent = () => {
     if (loading) return <div className="flex h-full items-center justify-center text-green-600"><Loader2 className="animate-spin h-10 w-10" /></div>;
@@ -168,7 +235,7 @@ const App: React.FC = () => {
       case Tab.SALES:
         return (
           <div className={`max-w-2xl mx-auto pb-20 ${contentClass}`}>
-            <SalesForm inventory={inventory} onSaleComplete={handleNewSale} onStockUpdate={() => {}} />
+            <SalesForm inventory={inventory} onSaleComplete={handleNewSale} onStockUpdate={() => {}} staffName={currentStaff} />
             <div className="mt-8">
               <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4 px-1 flex items-center">
                 Today's Transactions
@@ -190,15 +257,15 @@ const App: React.FC = () => {
           </div>
         );
       case Tab.INVENTORY:
-        return <div className={contentClass}><InventoryManager inventory={inventory} onUpdateInventory={(item) => updateInventoryInCloud(currentShop, item)} onAdjustStock={(id, adj) => { const item = inventory.find(i => i.id === id); if(item) adjustStockInCloud(currentShop, id, item.stockLevel, adj); }} onDeleteInventory={() => {}} shopName={shopNames[currentShop]} /></div>;
+        return <div className={contentClass}><InventoryManager inventory={inventory} onUpdateInventory={(item) => updateInventoryInCloud(currentShop, item)} onAdjustStock={(id, adj) => { const item = inventory.find(i => i.id === id); if(item) adjustStockInCloud(currentShop, id, item.stockLevel, adj); }} onDeleteInventory={handleDeleteInventory} shopName={shopNames[currentShop]} isSuperAdmin={isSuperAdmin} /></div>;
       case Tab.REPORT:
-        return <div className={contentClass}><DailyReport sales={sales} inventory={inventory} onDeleteSale={handleDeleteSale} onReset={handleResetDay} deletingIds={deletingIds} shopName={shopNames[currentShop]} /></div>;
+        return <div className={contentClass}><DailyReport sales={sales} expenses={expenses} inventory={inventory} onDeleteSale={handleDeleteSale} onAddExpense={handleAddExpense} onDeleteExpense={handleDeleteExpense} onReset={handleResetDay} deletingIds={deletingIds} shopName={shopNames[currentShop]} staffName={currentStaff} /></div>;
       case Tab.ARCHIVE:
-        return <div className={contentClass}><ArchiveView reports={reports} /></div>;
+        return <div className={contentClass}><ArchiveView reports={reports} onRestore={handleRestoreReport} onDelete={handleDeleteReport} /></div>;
       case Tab.WEEKLY:
-        return <div className={contentClass}><HistoricalReport sales={sales} inventory={inventory} timeframe="weekly" shopName={shopNames[currentShop]} /></div>;
+        return <div className={contentClass}><HistoricalReport liveSales={sales} archivedReports={reports} inventory={inventory} timeframe="weekly" shopName={shopNames[currentShop]} /></div>;
       case Tab.MONTHLY:
-        return <div className={contentClass}><HistoricalReport sales={sales} inventory={inventory} timeframe="monthly" shopName={shopNames[currentShop]} /></div>;
+        return <div className={contentClass}><HistoricalReport liveSales={sales} archivedReports={reports} inventory={inventory} timeframe="monthly" shopName={shopNames[currentShop]} /></div>;
       case Tab.SETTINGS:
         return (
           <div className={`max-w-md mx-auto bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm pb-20 dark:border-gray-700 border ${contentClass}`}>
@@ -280,6 +347,13 @@ const App: React.FC = () => {
                   <h1 className="text-2xl font-black text-green-600 tracking-tight">{shopNames[currentShop]}</h1>
               </div>
               <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold pl-1">Cloud POS v3.1</p>
+              <div className="mt-4 flex items-center px-3 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                 <UserCircle2 className="w-5 h-5 text-gray-400 mr-2" />
+                 <div>
+                    <p className="text-[10px] text-gray-400 uppercase font-bold">Logged in as</p>
+                    <p className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate max-w-[140px]">{currentStaff}</p>
+                 </div>
+              </div>
             </div>
             {isSuperAdmin && <div className="px-4 mb-4"><select value={currentShop} onChange={(e) => setCurrentShop(e.target.value as ShopId)} className="w-full p-2.5 rounded-lg text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white"><option value="greenspot">The Green Spot</option><option value="nearcannabis">Near Cannabis</option></select></div>}
             

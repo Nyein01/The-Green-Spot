@@ -1,4 +1,4 @@
-import { SaleItem, InventoryItem, ProductType, DayReport } from '../types';
+import { SaleItem, InventoryItem, ProductType, DayReport, Expense } from '../types';
 import { db } from '../firebaseConfig';
 // @ts-ignore
 import { 
@@ -20,14 +20,16 @@ const getCollections = (shopId: string) => {
     return {
       sales: 'sales_nc',
       inventory: 'inventory_nc',
-      reports: 'reports_nc'
+      reports: 'reports_nc',
+      expenses: 'expenses_nc'
     };
   }
   // Default to original collections for The Green Spot
   return {
     sales: 'sales',
     inventory: 'inventory',
-    reports: 'reports'
+    reports: 'reports',
+    expenses: 'expenses'
   };
 };
 
@@ -86,6 +88,23 @@ export const subscribeToReports = (shopId: string, callback: (reports: DayReport
   });
 };
 
+// Listen to Expenses updates
+export const subscribeToExpenses = (shopId: string, callback: (expenses: Expense[]) => void) => {
+  const { expenses } = getCollections(shopId);
+  const q = query(collection(db, expenses), orderBy("timestamp", "desc"));
+  
+  return onSnapshot(q, (snapshot) => {
+    const expensesData: Expense[] = [];
+    snapshot.forEach((doc) => {
+      expensesData.push(doc.data() as Expense);
+    });
+    callback(expensesData);
+  }, (error) => {
+    console.error("Error subscribing to expenses:", error);
+  });
+};
+
+
 // --- ACTIONS ---
 
 export const addSaleToCloud = async (shopId: string, sale: SaleItem) => {
@@ -95,6 +114,17 @@ export const addSaleToCloud = async (shopId: string, sale: SaleItem) => {
     return true;
   } catch (e: any) {
     console.error("Error adding sale: ", e);
+    return false;
+  }
+};
+
+export const addExpenseToCloud = async (shopId: string, expense: Expense) => {
+  const { expenses } = getCollections(shopId);
+  try {
+    await setDoc(doc(db, expenses, expense.id), sanitize(expense));
+    return true;
+  } catch (e: any) {
+    console.error("Error adding expense: ", e);
     return false;
   }
 };
@@ -150,6 +180,28 @@ export const deleteSaleFromCloud = async (shopId: string, saleId: string) => {
   }
 };
 
+export const deleteExpenseFromCloud = async (shopId: string, expenseId: string) => {
+  const { expenses } = getCollections(shopId);
+  try {
+    await deleteDoc(doc(db, expenses, expenseId));
+    return true;
+  } catch (e: any) {
+    console.error("Error deleting expense: ", e);
+    return false;
+  }
+};
+
+export const deleteInventoryItemFromCloud = async (shopId: string, itemId: string) => {
+  const { inventory } = getCollections(shopId);
+  try {
+    await deleteDoc(doc(db, inventory, itemId));
+    return true;
+  } catch (e: any) {
+    console.error("Error deleting inventory item: ", e);
+    return false;
+  }
+};
+
 export const updateInventoryInCloud = async (shopId: string, item: InventoryItem) => {
   const { inventory } = getCollections(shopId);
   try {
@@ -189,6 +241,23 @@ export const clearSalesInCloud = async (shopId: string, salesList: SaleItem[]) =
     return true;
   } catch (e: any) {
     console.error("Error clearing sales: ", e);
+    return false;
+  }
+};
+
+export const clearExpensesInCloud = async (shopId: string, expensesList: Expense[]) => {
+  if (expensesList.length === 0) return true;
+  const { expenses } = getCollections(shopId);
+  try {
+    const batch = writeBatch(db);
+    expensesList.forEach((e) => {
+      const ref = doc(db, expenses, e.id);
+      batch.delete(ref);
+    });
+    await batch.commit();
+    return true;
+  } catch (e: any) {
+    console.error("Error clearing expenses: ", e);
     return false;
   }
 };

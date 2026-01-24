@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { SaleItem, InventoryItem } from '../types';
+import React, { useMemo } from 'react';
+import { SaleItem, InventoryItem, DayReport } from '../types';
 import { formatCurrency } from '../utils/pricing';
 import { 
   TrendingUp, 
@@ -9,13 +9,26 @@ import {
 } from 'lucide-react';
 
 interface HistoricalReportProps {
-  sales: SaleItem[];
+  liveSales: SaleItem[];
+  archivedReports: DayReport[]; // Added archived reports source
   inventory: InventoryItem[];
   timeframe: 'weekly' | 'monthly';
   shopName: string;
 }
 
-export const HistoricalReport: React.FC<HistoricalReportProps> = ({ sales, inventory, timeframe, shopName }) => {
+export const HistoricalReport: React.FC<HistoricalReportProps> = ({ liveSales, archivedReports, inventory, timeframe, shopName }) => {
+  
+  // Combine Live Sales with Archived Sales from Reports to get the full picture
+  const allSales = useMemo(() => {
+      // Extract sales from archived reports
+      const archivedSales = archivedReports.flatMap(report => report.sales);
+      
+      // Combine with live sales (filtering out duplicates just in case, though logically shouldn't overlap if workflow is followed)
+      // A simple concat is usually fine if we assume 'liveSales' are strictly newer than archived ones.
+      // However, let's just combine them.
+      return [...liveSales, ...archivedSales];
+  }, [liveSales, archivedReports]);
+
   // Filter sales based on timeframe
   const filteredSales = useMemo(() => {
     const now = new Date();
@@ -31,8 +44,8 @@ export const HistoricalReport: React.FC<HistoricalReportProps> = ({ sales, inven
       startOfPeriod.setHours(0, 0, 0, 0);
     }
 
-    return sales.filter(s => s.timestamp >= startOfPeriod.getTime());
-  }, [sales, timeframe]);
+    return allSales.filter(s => s.timestamp >= startOfPeriod.getTime());
+  }, [allSales, timeframe]);
 
   // Calculations
   const totalRevenue = filteredSales.reduce((sum, s) => sum + s.price, 0);
@@ -109,7 +122,7 @@ export const HistoricalReport: React.FC<HistoricalReportProps> = ({ sales, inven
           </div>
           <div className="divide-y divide-gray-50 dark:divide-gray-700">
             {bestSellers.length === 0 ? (
-              <div className="p-12 text-center text-gray-400 italic">No sales data for this period.</div>
+              <div className="p-12 text-center text-gray-400 italic">No sales data for this period (including archived reports).</div>
             ) : (
               bestSellers.map((item, idx) => (
                 <div key={item.name} className="p-4 flex items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group">

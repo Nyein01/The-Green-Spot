@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { InventoryItem, ProductType, FlowerGrade } from '../types';
-import { Plus, Edit2, Save, X, ClipboardList, Minus, ShoppingCart, ArrowLeft, FileSpreadsheet, FileText, Loader2, ChevronUp, ChevronDown, ArrowUpDown, Leaf, Flame, Utensils, Zap, Package, Search } from 'lucide-react';
+import { Plus, Edit2, Save, X, ClipboardList, Minus, ShoppingCart, ArrowLeft, FileSpreadsheet, FileText, Loader2, ChevronUp, ChevronDown, ArrowUpDown, Leaf, Flame, Utensils, Zap, Package, Search, Lock, Trash2, CheckCircle2 } from 'lucide-react';
 import { generateId } from '../utils/pricing';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
@@ -11,17 +11,19 @@ interface InventoryManagerProps {
   onAdjustStock: (id: string, amount: number) => void;
   onDeleteInventory: (id: string) => void;
   shopName: string;
+  isSuperAdmin: boolean;
 }
 
 type SortField = 'name' | 'category' | 'grade' | 'stockLevel';
 type SortDirection = 'asc' | 'desc';
 
-export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, onUpdateInventory, onAdjustStock, shopName }) => {
+export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, onUpdateInventory, onAdjustStock, onDeleteInventory, shopName, isSuperAdmin }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showOrderList, setShowOrderList] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   
   // Sorting state
   const [sortField, setSortField] = useState<SortField>('grade'); // Default sort by grade
@@ -300,6 +302,17 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
     setIsAdding(true);
   };
 
+  const handleDeleteClick = (id: string) => {
+    if (deleteConfirmationId === id) {
+        onDeleteInventory(id);
+        setDeleteConfirmationId(null);
+    } else {
+        setDeleteConfirmationId(id);
+        // Auto-reset confirmation after 3 seconds
+        setTimeout(() => setDeleteConfirmationId(null), 3000);
+    }
+  }
+
   const availableCategories = Object.values(ProductType).filter(t => t !== ProductType.OTHER);
 
   const SortIndicator = ({ field }: { field: SortField }) => {
@@ -406,7 +419,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                     </>
                 )}
                 </button>
-                {!showOrderList && (
+                {!showOrderList && isSuperAdmin && (
                     <button 
                     onClick={() => setIsAdding(true)}
                     className="flex items-center text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors shadow-sm"
@@ -418,7 +431,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
         </div>
       </div>
 
-      {isAdding && (
+      {isAdding && isSuperAdmin && (
         <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/30 animate-in slide-in-from-top-4 duration-300">
           <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-3">{editingId ? 'Edit Product' : 'Add New Product'}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
@@ -518,7 +531,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                   Stock <SortIndicator field="stockLevel" />
                 </div>
               </th>
-              <th className="px-4 py-3 text-right" data-pdf-hide>Actions</th>
+              {isSuperAdmin && <th className="px-4 py-3 text-right" data-pdf-hide>Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -555,7 +568,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                   <React.Fragment key={category}>
                     {/* Group Header Row */}
                     <tr className={`${getCategoryColor(category as ProductType)} border-y dark:border-gray-700`}>
-                      <td colSpan={5} className="px-4 py-2 font-bold uppercase tracking-widest text-[11px] flex items-center">
+                      <td colSpan={isSuperAdmin ? 5 : 4} className="px-4 py-2 font-bold uppercase tracking-widest text-[11px] flex items-center">
                         {getCategoryIcon(category as ProductType)}
                         {category} ({inventoryItems.length})
                       </td>
@@ -587,8 +600,8 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                           <div className="flex items-center space-x-3">
                              <button 
                                onClick={() => onAdjustStock(item.id, -1)} 
-                               disabled={item.stockLevel <= 0 && showOrderList}
-                               className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition-colors touch-manipulation disabled:opacity-30 active:scale-95"
+                               disabled={!isSuperAdmin || (item.stockLevel <= 0 && showOrderList)}
+                               className={`w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition-colors touch-manipulation disabled:opacity-30 active:scale-95 ${!isSuperAdmin ? 'cursor-not-allowed opacity-40' : ''}`}
                                data-pdf-hide
                              >
                                <Minus className="w-3.5 h-3.5" />
@@ -601,20 +614,41 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                              </div>
                              <button 
                                onClick={() => onAdjustStock(item.id, 1)} 
-                               className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition-colors touch-manipulation active:scale-95"
+                               disabled={!isSuperAdmin}
+                               className={`w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition-colors touch-manipulation active:scale-95 ${!isSuperAdmin ? 'cursor-not-allowed opacity-40' : ''}`}
                                data-pdf-hide
                              >
                                <Plus className="w-3.5 h-3.5" />
                              </button>
+                             {!isSuperAdmin && (
+                                <Lock className="w-3 h-3 text-gray-300 dark:text-gray-600" />
+                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-right" data-pdf-hide>
-                          <div className="flex justify-end space-x-1 items-center">
-                            <button onClick={() => startEdit(item)} className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
+                        {isSuperAdmin && (
+                            <td className="px-4 py-3 text-right" data-pdf-hide>
+                            <div className="flex justify-end space-x-1 items-center">
+                                <button onClick={() => startEdit(item)} className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                                <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button 
+                                    onClick={() => handleDeleteClick(item.id)}
+                                    className={`p-2 rounded-lg transition-all ${
+                                        deleteConfirmationId === item.id 
+                                        ? 'bg-red-500 text-white hover:bg-red-600 shadow-md scale-110' 
+                                        : 'text-gray-400 hover:text-red-600 dark:hover:text-red-400 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20'
+                                    }`}
+                                    title={deleteConfirmationId === item.id ? "Confirm Delete" : "Delete Product"}
+                                >
+                                    {deleteConfirmationId === item.id ? (
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                    ) : (
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    )}
+                                </button>
+                            </div>
+                            </td>
+                        )}
                       </tr>
                     ))}
                   </React.Fragment>

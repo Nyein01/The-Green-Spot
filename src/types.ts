@@ -25,6 +25,7 @@ export interface SaleItem {
   originalPrice: number; // Calculated standard price
   isNegotiated: boolean;
   notes?: string;
+  staffName?: string; // Added to track who made the sale
 }
 
 export interface InventoryItem {
@@ -52,8 +53,8 @@ export interface DayReport {
   itemsSold: number;
   sales: SaleItem[];
   expenses?: Expense[];
-  inboxMoney?: number;
   timestamp: number;
+  closedBy?: string;
 }
 
 export enum Tab {

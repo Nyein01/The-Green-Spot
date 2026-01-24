@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SaleItem, InventoryItem, DayReport } from '../types';
+import { SaleItem, InventoryItem, DayReport, Expense } from '../types';
 import { formatCurrency, generateId } from '../utils/pricing';
 import { saveDayReportToCloud } from '../services/storageService';
 import { 
@@ -12,34 +12,57 @@ import {
   AlertCircle, 
   Save, 
   CheckCircle2, 
-  RefreshCw, 
-  AlertTriangle,
-  Coins
+  LogOut,
+  Coins,
+  Wallet,
+  Plus
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
 interface DailyReportProps {
   sales: SaleItem[];
+  expenses: Expense[];
   inventory: InventoryItem[];
   onDeleteSale: (sale: SaleItem) => void;
-  onReset: () => void;
+  onAddExpense: (description: string, amount: number) => Promise<void>;
+  onDeleteExpense: (id: string) => Promise<void>;
+  onReset: () => Promise<void>;
   deletingIds: Set<string>;
   shopName: string;
+  staffName: string;
 }
 
-export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDeleteSale, onReset, deletingIds, shopName }) => {
+export const DailyReport: React.FC<DailyReportProps> = ({ 
+  sales, 
+  expenses, 
+  inventory, 
+  onDeleteSale, 
+  onAddExpense,
+  onDeleteExpense,
+  onReset, 
+  deletingIds, 
+  shopName, 
+  staffName 
+}) => {
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
   const [reportSaved, setReportSaved] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState<SaleItem | null>(null);
 
+  // Expense Form State
+  const [expDesc, setExpDesc] = useState('');
+  const [expAmount, setExpAmount] = useState('');
+  const [isAddingExpense, setIsAddingExpense] = useState(false);
+
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.price, 0);
+  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
   
   const handleSaveAndArchive = async () => {
-    if (sales.length === 0) {
-        alert("No sales to archive.");
+    if (sales.length === 0 && expenses.length === 0) {
+        alert("No data to archive.");
         return;
     }
 
@@ -56,15 +79,17 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
         totalRevenue,
         itemsSold: sales.reduce((sum, s) => sum + s.quantity, 0),
         sales: sales,
-        timestamp: Date.now()
+        expenses: expenses,
+        timestamp: Date.now(),
+        closedBy: staffName
     };
 
     const success = await saveDayReportToCloud(shopId, report);
     
     if (success) {
         setReportSaved(true);
-        setTimeout(() => setReportSaved(false), 5000);
-        alert("Daily report has been saved to the archives!");
+        // Do NOT auto hide the success state immediately, so the user knows they can now close shift
+        alert("✅ Daily report saved to Archives!\nYou can now safely Close Shift.");
     } else {
         alert("Failed to save report. Please check connection.");
     }
@@ -72,11 +97,46 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
     setSavingReport(false);
   };
 
+  const handleCloseShift = async () => {
+      if (!reportSaved && (sales.length > 0 || expenses.length > 0)) {
+          alert("⚠️ Please 'Save & Archive Day' before closing the shift to ensure no data is lost.");
+          return;
+      }
+      
+      if (confirmReset) {
+          setIsClearing(true);
+          try {
+              await onReset();
+              setConfirmReset(false);
+              setReportSaved(false); // Reset state for next shift
+          } catch (error) {
+              console.error("Error clearing shift:", error);
+              alert("Failed to clear register. Please check internet connection.");
+          } finally {
+              setIsClearing(false);
+          }
+      } else {
+          setConfirmReset(true);
+          setTimeout(() => setConfirmReset(false), 3000);
+      }
+  };
+
   const confirmDelete = async () => {
     if (saleToDelete) {
       onDeleteSale(saleToDelete);
       setSaleToDelete(null);
     }
+  };
+
+  const handleNewExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!expDesc || !expAmount) return;
+    
+    setIsAddingExpense(true);
+    await onAddExpense(expDesc, Number(expAmount));
+    setExpDesc('');
+    setExpAmount('');
+    setIsAddingExpense(false);
   };
 
   const handleDownloadPDF = async () => {
@@ -163,12 +223,13 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
           <div className="mt-6 border-b border-dashed border-gray-200 pb-4">
              <p className="text-gray-400 text-[10px] uppercase mb-1">Date of Report</p>
              <p className="text-gray-700 font-bold text-base">{new Date().toLocaleDateString()} <span className="text-gray-400 font-normal">|</span> {new Date().toLocaleTimeString()}</p>
+             <p className="text-xs text-gray-500 mt-1">Staff: {staffName}</p>
           </div>
         </div>
 
         <div className="mb-6">
           <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase mb-3 border-b border-gray-200 pb-2 tracking-wider">
-            <span>Item Description</span>
+            <span>Sales Breakdown</span>
             <span>Amount</span>
           </div>
           <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2 receipt-scroll text-gray-800">
@@ -189,7 +250,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
                         </span>
                         {sale.grade && <span className="mx-1 text-gray-400">•</span>}
                         {sale.grade && <span className="text-gray-500">{sale.grade}</span>}
-                        {sale.isNegotiated && <span className="ml-2 text-blue-600 text-[10px] bg-blue-50 px-1.5 py-0.5 rounded font-medium border border-blue-100">Adjusted</span>}
+                        {sale.staffName && <span className="ml-2 text-gray-400 text-[9px] border border-gray-200 px-1 rounded">By: {sale.staffName.split(' ')[0]}</span>}
                       </div>
                     </div>
                   </div>
@@ -213,6 +274,28 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
             )}
           </div>
         </div>
+
+        {/* Expenses Section in Receipt */}
+        {expenses.length > 0 && (
+          <div className="mb-6 pt-4 border-t border-dashed border-gray-200">
+            <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-wider">
+              <span>Expenses (Internal)</span>
+              <span>Cost</span>
+            </div>
+            <div className="space-y-2 text-gray-800">
+                {expenses.map((exp) => (
+                    <div key={exp.id} className="flex justify-between items-center -mx-2 p-2 hover:bg-gray-50 rounded">
+                        <div className="text-sm">{exp.description}</div>
+                        <div className="font-mono text-red-500 text-sm">-{formatCurrency(exp.amount)}</div>
+                    </div>
+                ))}
+            </div>
+             <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100 text-xs">
+                <span className="text-gray-500">Total Expenses</span>
+                <span className="font-bold text-red-600">-{formatCurrency(totalExpenses)}</span>
+             </div>
+          </div>
+        )}
 
         <div className="space-y-3 pt-6 border-t-2 border-dashed border-gray-300">
           
@@ -257,6 +340,73 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
       {/* Analysis & Actions */}
       <div className="space-y-6">
         
+        {/* Expenses Manager Card */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-orange-100 dark:border-orange-900/30 transition-colors">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
+                    <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg mr-3 text-orange-600 dark:text-orange-400">
+                        <Wallet className="w-5 h-5" />
+                    </div>
+                    Expenses
+                </h3>
+                <span className="text-xs font-semibold bg-orange-100 text-orange-800 px-2 py-1 rounded">Internal Use</span>
+            </div>
+            
+            {/* Add Expense Form */}
+            <form onSubmit={handleNewExpense} className="flex gap-2 mb-4">
+                <input 
+                    type="text" 
+                    placeholder="Item (e.g. Food, Ice)" 
+                    value={expDesc}
+                    onChange={e => setExpDesc(e.target.value)}
+                    className="flex-1 text-sm p-2 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                <input 
+                    type="number" 
+                    placeholder="Cost" 
+                    value={expAmount}
+                    onChange={e => setExpAmount(e.target.value)}
+                    className="w-20 text-sm p-2 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                <button 
+                    type="submit"
+                    disabled={!expDesc || !expAmount || isAddingExpense}
+                    className="bg-orange-500 text-white p-2 rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {isAddingExpense ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                </button>
+            </form>
+
+            {/* Expenses List */}
+            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                {expenses.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic text-center py-2">No extra expenses recorded.</p>
+                ) : (
+                    expenses.map(exp => (
+                        <div key={exp.id} className="flex justify-between items-center text-sm p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700">
+                            <span className="text-gray-700 dark:text-gray-300 truncate max-w-[150px]">{exp.description}</span>
+                            <div className="flex items-center">
+                                <span className="font-bold text-gray-900 dark:text-gray-100 mr-3">{formatCurrency(exp.amount)}</span>
+                                <button 
+                                    onClick={() => onDeleteExpense(exp.id)}
+                                    className="text-gray-400 hover:text-red-500"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+            
+            {expenses.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-dashed border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <span className="text-xs font-bold text-gray-500 uppercase">Total Expenses</span>
+                    <span className="text-sm font-black text-orange-600 dark:text-orange-400">{formatCurrency(totalExpenses)}</span>
+                </div>
+            )}
+        </div>
+
         {/* Save & Archive Section */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-green-100 dark:border-green-900/30 overflow-hidden transition-colors">
             <div className="flex items-center justify-between mb-4">
@@ -264,30 +414,30 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
                     <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg mr-3 text-green-600 dark:text-green-400">
                         <Save className="w-5 h-5" />
                     </div>
-                    End of Day
+                    Step 1: Save Report
                 </h3>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                Save a permanent summary of today's sales to the cloud archives before clearing the data.
+                Save the current shift data to the Archive. This data will be used for Weekly & Monthly reports.
             </p>
             <button
                 onClick={handleSaveAndArchive}
-                disabled={savingReport || sales.length === 0}
+                disabled={savingReport || (sales.length === 0 && expenses.length === 0)}
                 className={`w-full flex items-center justify-center font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all transform active:scale-95 ${
                     reportSaved 
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' 
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 cursor-default' 
                     : 'bg-green-600 hover:bg-green-700 text-white shadow-green-100 dark:shadow-none'
                 } disabled:opacity-50`}
             >
                 {savingReport ? (
                     <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Archiving Data...
+                        Saving...
                     </>
                 ) : reportSaved ? (
                     <>
                         <CheckCircle2 className="w-5 h-5 mr-2" />
-                        Daily Report Saved
+                        Report Saved
                     </>
                 ) : (
                     <>
@@ -298,37 +448,48 @@ export const DailyReport: React.FC<DailyReportProps> = ({ sales, inventory, onDe
             </button>
         </div>
 
-        {/* Reset Data Section */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-red-100 dark:border-red-900/30 overflow-hidden transition-colors">
+        {/* Close Shift Section */}
+        <div className={`bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border transition-colors ${
+             reportSaved ? 'border-red-100 dark:border-red-900/30' : 'border-gray-100 dark:border-gray-700 opacity-60'
+        }`}>
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
-                    <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-lg mr-3 text-red-600 dark:text-red-400">
-                        <AlertTriangle className="w-5 h-5" />
+                    <div className={`p-2 rounded-lg mr-3 ${reportSaved ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' : 'bg-gray-100 text-gray-400'}`}>
+                        <LogOut className="w-5 h-5" />
                     </div>
-                    Reset Data
+                    Step 2: Close Shift
                 </h3>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                Clear all current sales data. This is useful for starting a new shift or clearing test data.
+                Clear the live register for the next shift. Ensure you have saved the report first.
             </p>
             <button
-                onClick={() => {
-                    if (confirmReset) {
-                        onReset();
-                        setConfirmReset(false);
-                    } else {
-                        setConfirmReset(true);
-                        setTimeout(() => setConfirmReset(false), 3000);
-                    }
-                }}
+                onClick={handleCloseShift}
+                disabled={!reportSaved && (sales.length > 0 || expenses.length > 0)}
                 className={`w-full flex items-center justify-center font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all transform active:scale-95 ${
                     confirmReset 
                     ? 'bg-red-600 text-white' 
-                    : 'bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 border-2 border-red-100 dark:border-red-900/50 hover:border-red-200'
+                    : !reportSaved && (sales.length > 0 || expenses.length > 0)
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 border-2 border-red-100 dark:border-red-900/50 hover:border-red-200'
                 }`}
             >
-                <RefreshCw className={`w-5 h-5 mr-2 ${confirmReset ? 'animate-spin' : ''}`} />
-                {confirmReset ? 'Confirm Reset' : 'Reset Sales Data'}
+                {isClearing ? (
+                    <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Clearing Register...
+                    </>
+                ) : confirmReset ? (
+                    <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Confirm Close
+                    </>
+                ) : (
+                    <>
+                        <LogOut className="w-5 h-5 mr-2" />
+                        Close Shift & Clear Register
+                    </>
+                )}
             </button>
         </div>
       </div>
