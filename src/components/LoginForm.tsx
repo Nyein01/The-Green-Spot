@@ -22,8 +22,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     const user = username.toLowerCase().trim();
     const pass = password.trim();
 
-    if (pass === '0000') { 
-        // Staff Profiles for The Green Spot
+    // Specific Staff Logins (Password: 1234)
+    if (pass === '1234') {
         if (user === 'nyein') {
             onLogin('greenspot', false, 'Staff 1 (Nyein)');
             return;
@@ -32,8 +32,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
             onLogin('greenspot', false, 'Staff 2 (Kevin)');
             return;
         }
-        
-        // General Shop Logins
+    }
+
+    // General Shop & Admin Logins (Password: 0000)
+    if (pass === '0000') { 
         if (user === 'greenspot') {
             onLogin('greenspot', false, 'Manager');
             return;
@@ -45,6 +47,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
         if (user === 'admin') {
             onLogin('greenspot', true, 'Super Admin'); // Admin starts at greenspot but can switch
             return;
+        }
+        // Fallback: Allow Nyein/Kevin to use 0000 as well if needed
+        if (user === 'nyein') {
+             onLogin('greenspot', false, 'Staff 1 (Nyein)');
+             return;
+        }
+        if (user === 'kevin') {
+             onLogin('greenspot', false, 'Staff 2 (Kevin)');
+             return;
         }
     }
 
