@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Leaf, Lock, User, Loader2, Users } from 'lucide-react';
+import { triggerHaptic } from '../utils/feedback';
 
 interface LoginFormProps {
   onLogin: (shopId: 'greenspot' | 'nearcannabis', isSuperAdmin: boolean, staffName: string) => void;
@@ -13,6 +14,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    triggerHaptic(); // Feedback on click
     setLoading(true);
     setError('');
     
@@ -22,7 +24,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     const user = username.toLowerCase().trim();
     const pass = password.trim();
 
-    // Specific Staff Logins (Password: 1234)
+    // Staff & Shop Logins (Password: 1234)
     if (pass === '1234') {
         if (user === 'nyein') {
             onLogin('greenspot', false, 'Staff 1 (Nyein)');
@@ -32,16 +34,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
             onLogin('greenspot', false, 'Staff 2 (Kevin)');
             return;
         }
+        if (user === 'nearcannabis' || user === 'nearcanabis') {
+            onLogin('nearcannabis', false, 'Staff (Near Cannabis)');
+            return;
+        }
     }
 
-    // General Shop & Admin Logins (Password: 0000)
+    // Manager & Admin Logins (Password: 0000)
     if (pass === '0000') { 
         if (user === 'greenspot') {
             onLogin('greenspot', false, 'Manager');
-            return;
-        }
-        if (user === 'nearcannabis' || user === 'nearcanabis') {
-            onLogin('nearcannabis', false, 'Staff');
             return;
         }
         if (user === 'admin') {

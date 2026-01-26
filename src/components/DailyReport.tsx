@@ -143,7 +143,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({
     setIsAddingExpense(false);
   };
 
-  // --- NEW PDF GENERATION LOGIC ---
+  // --- NEW PROFESSIONAL PDF GENERATION ---
   const handleDownloadPDF = async () => {
     setDownloadingPdf(true);
 
@@ -159,7 +159,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({
         position: 'fixed',
         top: '-10000px', // Hide off-screen
         left: '0',
-        width: '1200px', // High resolution width
+        width: '1200px', // High resolution width for clear text
         backgroundColor: '#ffffff',
         fontFamily: "'Inter', sans-serif",
         color: '#111827',
@@ -490,7 +490,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({
         </div>
       </div>
 
-      {/* Analysis & Actions */}
+      {/* Actions Panel */}
       <div className="space-y-6">
         
         {/* Expenses Manager Card */}

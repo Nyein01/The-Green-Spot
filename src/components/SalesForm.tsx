@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ProductType, FlowerGrade, InventoryItem, SaleItem } from '../types';
 import { calculateFlowerPrice, formatCurrency, generateId } from '../utils/pricing';
 import { ShoppingCart, Tag, AlertCircle, Search, X, ChevronDown, Check, Loader2, PartyPopper, Banknote, QrCode, Flame, Trophy } from 'lucide-react';
+import { triggerHaptic } from '../utils/feedback';
 
 interface SalesFormProps {
   inventory: InventoryItem[];
@@ -72,6 +73,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    triggerHaptic();
 
     if (!selectedStrain) return alert("Please select a product.");
 
@@ -124,6 +126,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   };
 
   const handleTypeChange = (type: ProductType) => {
+      triggerHaptic();
       setProductType(type);
       setSelectedStrain('');
       setSearchQuery('');
@@ -132,6 +135,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   }
 
   const handleSelectItem = (item: InventoryItem) => {
+    triggerHaptic();
     setSelectedStrain(item.name);
     setSearchQuery(item.name);
     setIsDropdownOpen(false);
@@ -276,6 +280,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                   key={g}
                   type="button"
                   onClick={() => {
+                    triggerHaptic();
                     setGrade(g);
                     setIsAutoPrice(true);
                   }}
@@ -300,7 +305,10 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
           <div className="flex items-center space-x-2">
             <button
               type="button"
-              onClick={() => setQuantity(Math.max(productType === ProductType.FLOWER ? 0.5 : 1, quantity - (productType === ProductType.FLOWER ? 0.5 : 1)))}
+              onClick={() => {
+                triggerHaptic();
+                setQuantity(Math.max(productType === ProductType.FLOWER ? 0.5 : 1, quantity - (productType === ProductType.FLOWER ? 0.5 : 1)));
+              }}
               className="p-3 sm:p-2 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 touch-manipulation transition-colors"
             >
               -
@@ -314,7 +322,10 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
             />
             <button
               type="button"
-              onClick={() => setQuantity(quantity + (productType === ProductType.FLOWER ? 0.5 : 1))}
+              onClick={() => {
+                triggerHaptic();
+                setQuantity(quantity + (productType === ProductType.FLOWER ? 0.5 : 1));
+              }}
               className="p-3 sm:p-2 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 touch-manipulation transition-colors"
             >
               +
@@ -328,7 +339,10 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Price</label>
             <button
               type="button"
-              onClick={() => setIsAutoPrice(!isAutoPrice)}
+              onClick={() => {
+                  triggerHaptic();
+                  setIsAutoPrice(!isAutoPrice);
+              }}
               className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center p-1"
             >
               <Tag className="w-3 h-3 mr-1" />
@@ -373,7 +387,10 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
             <div className="grid grid-cols-2 gap-3">
                 <button
                     type="button"
-                    onClick={() => setPaymentMethod('Cash')}
+                    onClick={() => {
+                        triggerHaptic();
+                        setPaymentMethod('Cash');
+                    }}
                     className={`flex items-center justify-center p-3 rounded-lg border transition-all ${
                         paymentMethod === 'Cash'
                         ? 'bg-green-100 border-green-500 text-green-800 dark:bg-green-900/40 dark:text-green-300 dark:border-green-600 shadow-md transform scale-[1.02]'
@@ -385,7 +402,10 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                 </button>
                 <button
                     type="button"
-                    onClick={() => setPaymentMethod('Scan')}
+                    onClick={() => {
+                        triggerHaptic();
+                        setPaymentMethod('Scan');
+                    }}
                     className={`flex items-center justify-center p-3 rounded-lg border transition-all ${
                         paymentMethod === 'Scan'
                         ? 'bg-blue-100 border-blue-500 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-600 shadow-md transform scale-[1.02]'

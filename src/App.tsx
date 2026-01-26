@@ -52,6 +52,7 @@ import {
 } from './services/storageService';
 import { SaleItem, InventoryItem, DayReport, Tab, Expense } from './types';
 import { generateId } from './utils/pricing';
+import { triggerHaptic } from './utils/feedback';
 
 type ShopId = 'greenspot' | 'nearcannabis';
 
@@ -125,6 +126,7 @@ const App: React.FC = () => {
   }, [currentShop, isAuthenticated]);
 
   const toggleDarkMode = () => {
+    triggerHaptic();
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
     localStorage.setItem('greentrack_theme', newMode ? 'dark' : 'light');
@@ -132,6 +134,7 @@ const App: React.FC = () => {
   };
 
   const toggleMatrixMode = () => {
+      triggerHaptic();
       const newMatrix = !isMatrixMode;
       setIsMatrixMode(newMatrix);
       localStorage.setItem('greentrack_matrix', newMatrix ? 'true' : 'false');
@@ -449,7 +452,7 @@ const App: React.FC = () => {
                 { t: Tab.REPORT, i: <FileText className="w-5 h-5 mr-3" /> },
                 { t: Tab.ARCHIVE, i: <Archive className="w-5 h-5 mr-3" /> },
               ].map(item => (
-                <button key={item.t} onClick={() => { setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none font-bold scale-105' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{item.i}{item.t}</button>
+                <button key={item.t} onClick={() => { triggerHaptic(); setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none font-bold scale-105' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{item.i}{item.t}</button>
               ))}
               <div className="pt-4 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Analytics</div>
               {[
@@ -457,7 +460,7 @@ const App: React.FC = () => {
                 { t: Tab.MONTHLY, i: <BarChart3 className="w-5 h-5 mr-3" /> },
                 { t: Tab.SETTINGS, i: <Cloud className="w-5 h-5 mr-3" /> },
               ].map(item => (
-                <button key={item.t} onClick={() => { setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-indigo-600 text-white font-bold scale-105' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{item.i}{item.t}</button>
+                <button key={item.t} onClick={() => { triggerHaptic(); setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-indigo-600 text-white font-bold scale-105' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{item.i}{item.t}</button>
               ))}
             </div>
           </div>
