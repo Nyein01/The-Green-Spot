@@ -5,7 +5,7 @@ import { generateId } from '../utils/pricing';
 import { generateInventoryAnalysis } from '../services/geminiService';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
-import { triggerHaptic } from '../utils/feedback';
+import { translations, Language } from '../utils/translations';
 
 interface InventoryManagerProps {
   inventory: InventoryItem[];
@@ -14,12 +14,13 @@ interface InventoryManagerProps {
   onDeleteInventory: (id: string) => void;
   shopName: string;
   isSuperAdmin: boolean;
+  language: Language;
 }
 
 type SortField = 'name' | 'category' | 'grade' | 'stockLevel';
 type SortDirection = 'asc' | 'desc';
 
-export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, onUpdateInventory, onAdjustStock, onDeleteInventory, shopName, isSuperAdmin }) => {
+export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, onUpdateInventory, onAdjustStock, onDeleteInventory, shopName, isSuperAdmin, language }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showOrderList, setShowOrderList] = useState(false);
@@ -27,6 +28,8 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   
+  const t = translations[language];
+
   // Sorting state
   const [sortField, setSortField] = useState<SortField>('grade'); // Default sort by grade
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc'); // Top Shelf first
@@ -44,7 +47,6 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
   });
 
   const handleSave = () => {
-    triggerHaptic();
     if (!formState.name) return alert("Name is required");
     
     const item: InventoryItem = {
@@ -62,7 +64,6 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
   };
 
   const handleSort = (field: SortField) => {
-    triggerHaptic();
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -139,7 +140,6 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
   }, [showOrderList, activeItems, outOfStockItems, sortField, sortDirection, searchQuery]);
 
   const handleExportCSV = () => {
-    triggerHaptic();
     if (inventory.length === 0) {
       alert("Inventory is empty. Nothing to export.");
       return;
@@ -168,7 +168,8 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
   };
 
   const handleExportPDF = async () => {
-    triggerHaptic();
+    // ... (PDF logic remains same, can enhance with language later if needed)
+    // For brevity, keeping English for PDF report as it's often a standard
     if (inventory.length === 0) {
       alert("Inventory is empty.");
       return;
@@ -177,30 +178,24 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
     setIsExportingPDF(true);
 
     try {
-      // 1. Get AI Summary
       const aiSummary = await generateInventoryAnalysis(inventory);
-
-      // 2. Create an invisible container on the DOM to act as our "Paper"
-      // We do this to ensure it renders at desktop width even on mobile phones.
       const printContainer = document.createElement('div');
       printContainer.id = 'pdf-print-container';
       printContainer.style.position = 'fixed';
       printContainer.style.top = '-9999px';
       printContainer.style.left = '0';
-      printContainer.style.width = '1200px'; // Force wide layout
+      printContainer.style.width = '1200px'; 
       printContainer.style.backgroundColor = '#ffffff';
       printContainer.style.fontFamily = 'Inter, sans-serif';
-      printContainer.style.color = '#000000'; // FORCE BLACK TEXT
+      printContainer.style.color = '#000000';
       printContainer.style.padding = '40px';
       
-      // 3. Build the HTML String for the report
       let tableRows = '';
       
       Object.entries(groupedInventory).forEach(([category, items]) => {
          const invItems = items as InventoryItem[];
          if (invItems.length === 0) return;
 
-         // Category Header - Force Text Color
          tableRows += `
             <tr style="background-color: #f0fdf4; border-bottom: 2px solid #22c55e;">
                 <td colspan="4" style="padding: 12px; font-weight: 800; text-transform: uppercase; font-size: 14px; color: #166534;">
@@ -209,12 +204,10 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
             </tr>
          `;
 
-         // Items
          invItems.forEach((item, index) => {
              const rowBg = index % 2 === 0 ? '#ffffff' : '#f9fafb';
-             const stockColor = item.stockLevel <= 5 ? '#dc2626' : '#374151'; // Red if low, Dark Gray otherwise
+             const stockColor = item.stockLevel <= 5 ? '#dc2626' : '#374151';
              
-             // STRICTLY ENFORCE COLOR ON TD TO OVERRIDE ANY DARK MODE INHERITANCE
              tableRows += `
                 <tr style="background-color: ${rowBg}; border-bottom: 1px solid #e5e7eb;">
                     <td style="padding: 12px; font-weight: 600; color: #111827;">${item.name}</td>
@@ -280,17 +273,14 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
 
       document.body.appendChild(printContainer);
 
-      // 4. Capture the High-Res Image of the "Desktop" container
       const canvas = await html2canvas(printContainer, {
         scale: 2, // Retina quality
         useCORS: true,
         backgroundColor: '#ffffff'
       });
 
-      // 5. Remove the temporary container
       document.body.removeChild(printContainer);
 
-      // 6. Create PDF
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -334,14 +324,12 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
   };
 
   const startEdit = (item: InventoryItem) => {
-    triggerHaptic();
     setFormState(item);
     setEditingId(item.id);
     setIsAdding(true);
   };
 
   const handleDeleteClick = (id: string) => {
-    triggerHaptic();
     if (deleteConfirmationId === id) {
         onDeleteInventory(id);
         setDeleteConfirmationId(null);
@@ -382,7 +370,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
   const hasData = Object.values(groupedInventory).some(list => (list as InventoryItem[]).length > 0);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors animate-fade-in">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-colors animate-fade-in relative">
       <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-start xl:items-center bg-gray-50 dark:bg-gray-700/30 gap-3">
         
         <div className="flex items-center justify-between w-full xl:w-auto">
@@ -390,10 +378,10 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                 {showOrderList ? (
                     <>
                         <ShoppingCart className="w-5 h-5 mr-2 text-amber-500" />
-                        Order List ({outOfStockItems.length})
+                        {t.orderList} ({outOfStockItems.length})
                     </>
                 ) : (
-                    "Inventory Management"
+                    t.inventoryManagement
                 )}
             </h2>
         </div>
@@ -409,7 +397,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search product..."
+                    placeholder={t.searchPlaceholder}
                     className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 outline-none transition-all"
                 />
                 {searchQuery && (
@@ -441,18 +429,17 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                 </button>
                 <button 
                 onClick={() => {
-                    triggerHaptic();
                     setShowOrderList(!showOrderList);
                 }}
                 className={`flex items-center text-xs px-3 py-1.5 rounded-lg transition-colors shadow-sm ${showOrderList ? 'bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-600 dark:text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}
                 >
                 {showOrderList ? (
                     <>
-                        <ArrowLeft className="w-3 h-3 mr-1" /> Back to Stock
+                        <ArrowLeft className="w-3 h-3 mr-1" /> Back
                     </>
                 ) : (
                     <>
-                        <ClipboardList className="w-3 h-3 mr-1" /> Order List
+                        <ClipboardList className="w-3 h-3 mr-1" /> {t.orderList}
                         {outOfStockItems.length > 0 && (
                             <span className="ml-1.5 bg-white text-amber-600 px-1.5 rounded-full text-[10px] font-bold">
                                 {outOfStockItems.length}
@@ -464,12 +451,11 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                 {!showOrderList && isSuperAdmin && (
                     <button 
                     onClick={() => {
-                        triggerHaptic();
                         setIsAdding(true);
                     }}
                     className="flex items-center text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors shadow-sm"
                     >
-                    <Plus className="w-3 h-3 mr-1" /> Add Product
+                    <Plus className="w-3 h-3 mr-1" /> {t.addProduct}
                     </button>
                 )}
             </div>
@@ -478,12 +464,12 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
 
       {isAdding && isSuperAdmin && (
         <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/30 animate-in slide-in-from-top-4 duration-300">
-          <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-3">{editingId ? 'Edit Product' : 'Add New Product'}</h3>
+          <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-3">{editingId ? t.editProduct : t.addNewProduct}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
             <div className="lg:col-span-2">
                 <input 
                 type="text" 
-                placeholder="Product Name" 
+                placeholder={t.productName}
                 value={formState.name || ''}
                 onChange={e => setFormState({...formState, name: e.target.value})}
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md text-sm outline-none focus:border-blue-500 transition-all"
@@ -517,7 +503,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
 
             <input 
               type="number" 
-              placeholder="Current Stock" 
+              placeholder={t.currentStock}
               value={formState.stockLevel}
               onChange={e => setFormState({...formState, stockLevel: parseFloat(e.target.value)})}
               className="p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md text-sm outline-none focus:border-blue-500 transition-all"
@@ -525,10 +511,10 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
           </div>
           <div className="flex space-x-2">
             <button onClick={handleSave} className="flex items-center bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-blue-700 transition-colors shadow-sm">
-              <Save className="w-3 h-3 mr-1" /> Save
+              <Save className="w-3 h-3 mr-1" /> {t.save}
             </button>
             <button onClick={resetForm} className="flex items-center bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-200 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm">
-              <X className="w-3 h-3 mr-1" /> Cancel
+              <X className="w-3 h-3 mr-1" /> {t.cancel}
             </button>
           </div>
         </div>
@@ -543,7 +529,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                 onClick={() => handleSort('name')}
               >
                 <div className="flex items-center">
-                  Product <SortIndicator field="name" />
+                  {t.productName} <SortIndicator field="name" />
                 </div>
               </th>
               <th 
@@ -551,7 +537,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                 onClick={() => handleSort('category')}
               >
                 <div className="flex items-center">
-                  Type <SortIndicator field="category" />
+                  {t.category} <SortIndicator field="category" />
                 </div>
               </th>
               <th 
@@ -559,7 +545,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                 onClick={() => handleSort('grade')}
               >
                 <div className="flex items-center">
-                  Details <SortIndicator field="grade" />
+                  {t.grade} <SortIndicator field="grade" />
                 </div>
               </th>
               <th 
@@ -567,35 +553,20 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                 onClick={() => handleSort('stockLevel')}
               >
                 <div className="flex items-center">
-                  Stock <SortIndicator field="stockLevel" />
+                  {t.stock} <SortIndicator field="stockLevel" />
                 </div>
               </th>
-              {isSuperAdmin && <th className="px-4 py-3 text-right" data-pdf-hide>Actions</th>}
+              {isSuperAdmin && <th className="px-4 py-3 text-right" data-pdf-hide>{t.actions}</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {!hasData ? (
                <tr>
                    <td colSpan={5} className="text-center py-12 text-gray-400 dark:text-gray-500">
-                       {searchQuery ? (
-                            <div className="flex flex-col items-center">
-                                <Search className="w-10 h-10 mb-2 opacity-30" />
-                                <p className="text-base font-medium">No matching items found.</p>
-                                <p className="text-xs opacity-75">Try a different search term.</p>
-                            </div>
-                       ) : showOrderList ? (
-                           <div className="flex flex-col items-center">
-                               <ClipboardList className="w-10 h-10 mb-2 opacity-30" />
-                               <p className="text-base font-medium">Order list is empty.</p>
-                               <p className="text-xs opacity-75">All items are currently in stock!</p>
-                           </div>
-                       ) : (
-                           <div className="flex flex-col items-center">
-                               <Package className="w-10 h-10 mb-2 opacity-30" />
-                               <p className="text-base font-medium">No items in inventory.</p>
-                               <p className="text-xs opacity-75">Start by adding your first product.</p>
-                           </div>
-                       )}
+                       <div className="flex flex-col items-center">
+                           <Package className="w-10 h-10 mb-2 opacity-30" />
+                           <p className="text-base font-medium">No items found.</p>
+                       </div>
                    </td>
                </tr>
             ) : (
@@ -639,7 +610,6 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                           <div className="flex items-center space-x-3">
                              <button 
                                onClick={() => {
-                                   triggerHaptic();
                                    onAdjustStock(item.id, -1);
                                }} 
                                disabled={!isSuperAdmin || (item.stockLevel <= 0 && showOrderList)}
@@ -656,7 +626,6 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                              </div>
                              <button 
                                onClick={() => {
-                                   triggerHaptic();
                                    onAdjustStock(item.id, 1);
                                }} 
                                disabled={!isSuperAdmin}
@@ -665,9 +634,6 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
                              >
                                <Plus className="w-3.5 h-3.5" />
                              </button>
-                             {!isSuperAdmin && (
-                                <Lock className="w-3 h-3 text-gray-300 dark:text-gray-600" />
-                             )}
                           </div>
                         </td>
                         {isSuperAdmin && (

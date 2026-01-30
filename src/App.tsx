@@ -12,17 +12,14 @@ import {
   Database,
   Wifi,
   WifiOff,
-  Store,
   LogOut,
   TrendingUp,
   BarChart3,
-  Library,
   Archive,
   Loader2,
   UserCircle2,
-  Banknote,
-  QrCode,
-  Terminal
+  Globe,
+  Check
 } from 'lucide-react';
 import { LoginForm } from './components/LoginForm';
 import { SalesForm } from './components/SalesForm';
@@ -46,13 +43,12 @@ import {
   clearExpensesInCloud,
   migrateLocalToCloud,
   seedDefaultInventory,
-  saveDayReportToCloud,
   restoreSalesBatch,
   deleteReportFromCloud
 } from './services/storageService';
 import { SaleItem, InventoryItem, DayReport, Tab, Expense } from './types';
 import { generateId } from './utils/pricing';
-import { triggerHaptic } from './utils/feedback';
+import { translations, Language } from './utils/translations';
 
 type ShopId = 'greenspot' | 'nearcannabis';
 
@@ -71,30 +67,33 @@ const App: React.FC = () => {
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [isMatrixMode, setIsMatrixMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  
+  // Language State
+  const [language, setLanguage] = useState<Language>('en');
 
   const shopNames = {
     greenspot: "The Green Spot",
     nearcannabis: "Near Cannabis"
   };
 
+  const t = translations[language];
+
   useEffect(() => {
-    // Check local storage for theme preference on mount
+    // Check local storage for theme & language
     const savedTheme = localStorage.getItem('greentrack_theme');
-    const savedMatrix = localStorage.getItem('greentrack_matrix');
+    const savedLang = localStorage.getItem('greentrack_lang') as Language;
     
     if (savedTheme === 'dark') {
       setIsDarkMode(true);
     } else if (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setIsDarkMode(true);
     }
-    
-    if (savedMatrix === 'true') {
-        setIsMatrixMode(true);
-        setIsDarkMode(true); // Matrix implies dark mode
+
+    if (savedLang) {
+        setLanguage(savedLang);
     }
   }, []);
 
@@ -126,22 +125,14 @@ const App: React.FC = () => {
   }, [currentShop, isAuthenticated]);
 
   const toggleDarkMode = () => {
-    triggerHaptic();
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
     localStorage.setItem('greentrack_theme', newMode ? 'dark' : 'light');
-    if (!newMode) setIsMatrixMode(false); // Disable matrix if going to light mode
   };
 
-  const toggleMatrixMode = () => {
-      triggerHaptic();
-      const newMatrix = !isMatrixMode;
-      setIsMatrixMode(newMatrix);
-      localStorage.setItem('greentrack_matrix', newMatrix ? 'true' : 'false');
-      if (newMatrix) {
-          setIsDarkMode(true);
-          localStorage.setItem('greentrack_theme', 'dark');
-      }
+  const changeLanguage = (lang: Language) => {
+      setLanguage(lang);
+      localStorage.setItem('greentrack_lang', lang);
   }
 
   const handleNewSale = async (sale: SaleItem) => {
@@ -249,7 +240,7 @@ const App: React.FC = () => {
     setCurrentShop('greenspot'); setIsSuperAdmin(false); setCurrentStaff('');
   }
 
-  if (!isAuthenticated) return <LoginForm onLogin={handleLogin} />;
+  if (!isAuthenticated) return <LoginForm onLogin={handleLogin} language={language} setLanguage={changeLanguage} />;
 
   const renderContent = () => {
     if (loading) return <div className="flex h-full items-center justify-center text-green-600"><Loader2 className="animate-spin h-10 w-10" /></div>;
@@ -260,10 +251,10 @@ const App: React.FC = () => {
       case Tab.SALES:
         return (
           <div className={`max-w-2xl mx-auto pb-20 ${contentClass}`}>
-            <SalesForm inventory={inventory} onSaleComplete={handleNewSale} onStockUpdate={() => {}} staffName={currentStaff} />
+            <SalesForm inventory={inventory} onSaleComplete={handleNewSale} onStockUpdate={() => {}} staffName={currentStaff} language={language} />
             <div className="mt-8">
               <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4 px-1 flex items-center">
-                Today's Transactions
+                {t.today}
                 <span className="ml-2 text-xs font-normal bg-green-100 text-green-800 px-2 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">Live</span>
               </h3>
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 divide-y dark:divide-gray-700 overflow-hidden">
@@ -273,8 +264,6 @@ const App: React.FC = () => {
                     <div>
                       <div className="font-medium text-gray-800 dark:text-gray-200 flex items-center">
                           {sale.productName}
-                          {sale.paymentMethod === 'Scan' && <QrCode className="w-3 h-3 ml-2 text-blue-400" />}
-                          {sale.paymentMethod === 'Cash' && <Banknote className="w-3 h-3 ml-2 text-green-400" />}
                       </div>
                       <div className="text-xs text-gray-500">{new Date(sale.timestamp).toLocaleTimeString()} • {sale.quantity} {sale.productType === 'Flower' ? 'g' : 'units'}</div>
                     </div>
@@ -286,7 +275,7 @@ const App: React.FC = () => {
           </div>
         );
       case Tab.INVENTORY:
-        return <div className={contentClass}><InventoryManager inventory={inventory} onUpdateInventory={(item) => updateInventoryInCloud(currentShop, item)} onAdjustStock={(id, adj) => { const item = inventory.find(i => i.id === id); if(item) adjustStockInCloud(currentShop, id, item.stockLevel, adj); }} onDeleteInventory={handleDeleteInventory} shopName={shopNames[currentShop]} isSuperAdmin={isSuperAdmin} /></div>;
+        return <div className={contentClass}><InventoryManager inventory={inventory} onUpdateInventory={(item) => updateInventoryInCloud(currentShop, item)} onAdjustStock={(id, adj) => { const item = inventory.find(i => i.id === id); if(item) adjustStockInCloud(currentShop, id, item.stockLevel, adj); }} onDeleteInventory={handleDeleteInventory} shopName={shopNames[currentShop]} isSuperAdmin={isSuperAdmin} language={language} /></div>;
       case Tab.REPORT:
         return <div className={contentClass}><DailyReport sales={sales} expenses={expenses} inventory={inventory} onDeleteSale={handleDeleteSale} onAddExpense={handleAddExpense} onDeleteExpense={handleDeleteExpense} onReset={handleResetDay} deletingIds={deletingIds} shopName={shopNames[currentShop]} staffName={currentStaff} /></div>;
       case Tab.ARCHIVE:
@@ -298,28 +287,36 @@ const App: React.FC = () => {
       case Tab.SETTINGS:
         return (
           <div className={`max-w-md mx-auto bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm pb-20 dark:border-gray-700 border ${contentClass}`}>
-            <h2 className="text-xl font-bold mb-6 dark:text-white">System Settings</h2>
+            <h2 className="text-xl font-bold mb-6 dark:text-white">{t.settings}</h2>
             <div className="space-y-4">
               
-              {/* Cool Feature: Matrix Mode Toggle */}
-              <button 
-                  onClick={toggleMatrixMode} 
-                  className={`group w-full flex items-center justify-between p-4 rounded-lg border transition-all ${
-                      isMatrixMode 
-                      ? 'bg-black border-green-500 text-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' 
-                      : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200'
-                  }`}
-              >
-                  <div className="flex items-center">
-                    <Terminal className="w-5 h-5 mr-3" />
-                    <span className={isMatrixMode ? 'font-mono uppercase tracking-widest' : 'font-medium'}>
-                        {isMatrixMode ? 'Matrix Mode: ACTIVE' : 'Matrix Mode'}
-                    </span>
+              {/* Language Selector */}
+              <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+                  <div className="flex items-center text-gray-800 dark:text-white mb-3 font-bold">
+                    <Globe className="w-5 h-5 mr-2" />
+                    {t.language}
                   </div>
-                  <div className={`w-10 h-5 rounded-full relative transition-colors ${isMatrixMode ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                      <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${isMatrixMode ? 'translate-x-5' : ''}`}></div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button 
+                        onClick={() => changeLanguage('en')}
+                        className={`p-2 rounded-lg text-sm font-medium transition-colors ${language === 'en' ? 'bg-green-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}
+                    >
+                        English
+                    </button>
+                    <button 
+                        onClick={() => changeLanguage('th')}
+                        className={`p-2 rounded-lg text-sm font-medium transition-colors ${language === 'th' ? 'bg-green-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}
+                    >
+                        ไทย
+                    </button>
+                    <button 
+                        onClick={() => changeLanguage('mm')}
+                        className={`p-2 rounded-lg text-sm font-medium transition-colors ${language === 'mm' ? 'bg-green-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}
+                    >
+                        မြန်မာ
+                    </button>
                   </div>
-              </button>
+              </div>
 
               <div className={`p-4 rounded-lg border transition-all duration-500 ${
                 isOnline 
@@ -332,22 +329,15 @@ const App: React.FC = () => {
                     : 'text-orange-900 dark:text-orange-100'
                 }`}>
                     {isOnline ? <Wifi className="w-5 h-5 mr-2" /> : <WifiOff className="w-5 h-5 mr-2" />} 
-                    Status: {isOnline ? 'Connected' : 'Offline'}
+                    {t.cloudStatus}: {isOnline ? t.connected : t.offline}
                 </div>
-                <p className={`text-xs ${
-                    isOnline 
-                    ? 'text-blue-700 dark:text-blue-300' 
-                    : 'text-orange-700 dark:text-orange-300'
-                }`}>
-                    {isOnline ? 'All data is syncing live with Google Cloud.' : 'Data restoration is disabled while offline.'}
-                </p>
               </div>
               
               <button 
                   onClick={handleMigrate} 
                   className="group w-full flex items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 text-sm font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-700 hover:text-blue-700 dark:hover:text-blue-300 transition-all text-gray-700 dark:text-gray-200"
               >
-                  <Cloud className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" /> Migrate Local Data
+                  <Cloud className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" /> {t.migrateData}
               </button>
 
               {inventory.length === 0 && (
@@ -355,7 +345,7 @@ const App: React.FC = () => {
                     onClick={handleSeed} 
                     className="group w-full flex items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 text-sm font-medium hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-200 dark:hover:border-green-700 hover:text-green-700 dark:hover:text-green-300 transition-all text-gray-700 dark:text-gray-200"
                   >
-                      <Database className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" /> Seed Starter Data
+                      <Database className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" /> {t.loadDefault}
                   </button>
               )}
             </div>
@@ -367,44 +357,6 @@ const App: React.FC = () => {
 
   return (
     <div className={`${isDarkMode ? 'dark' : ''}`}>
-      {isMatrixMode && (
-          <style>{`
-            :root {
-                --matrix-green: #00ff41;
-                --matrix-black: #0d0208;
-                --matrix-dark-green: #003b00;
-            }
-            body, .dark, .bg-white, .bg-gray-50, .bg-gray-100, .bg-gray-800, .bg-gray-900 {
-                background-color: black !important;
-                color: var(--matrix-green) !important;
-                font-family: 'Courier New', Courier, monospace !important;
-            }
-            .border, .border-gray-100, .border-gray-200, .border-gray-700 {
-                border-color: var(--matrix-green) !important;
-                border-width: 1px !important;
-                border-radius: 0px !important;
-            }
-            .rounded-xl, .rounded-lg, .rounded-md, .rounded-full {
-                border-radius: 0px !important;
-            }
-            button, input, select {
-                border: 1px solid var(--matrix-green) !important;
-                background: black !important;
-                color: var(--matrix-green) !important;
-                box-shadow: none !important;
-            }
-            button:hover {
-                background: var(--matrix-green) !important;
-                color: black !important;
-            }
-            input::placeholder {
-                color: #008f11 !important;
-            }
-            .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl {
-                box-shadow: 0 0 5px var(--matrix-green) !important;
-            }
-          `}</style>
-      )}
       <style>{`
         @keyframes slideInUp {
           from { opacity: 0; transform: translateY(15px); }
@@ -447,27 +399,27 @@ const App: React.FC = () => {
             
             <div className="px-4 space-y-1 mt-4">
               {[
-                { t: Tab.SALES, i: <PlusCircle className="w-5 h-5 mr-3" /> },
-                { t: Tab.INVENTORY, i: <Package className="w-5 h-5 mr-3" /> },
-                { t: Tab.REPORT, i: <FileText className="w-5 h-5 mr-3" /> },
-                { t: Tab.ARCHIVE, i: <Archive className="w-5 h-5 mr-3" /> },
+                { t: Tab.SALES, l: t.sales, i: <PlusCircle className="w-5 h-5 mr-3" /> },
+                { t: Tab.INVENTORY, l: t.inventory, i: <Package className="w-5 h-5 mr-3" /> },
+                { t: Tab.REPORT, l: t.report, i: <FileText className="w-5 h-5 mr-3" /> },
+                { t: Tab.ARCHIVE, l: t.archive, i: <Archive className="w-5 h-5 mr-3" /> },
               ].map(item => (
-                <button key={item.t} onClick={() => { triggerHaptic(); setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none font-bold scale-105' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{item.i}{item.t}</button>
+                <button key={item.t} onClick={() => { setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none font-bold scale-105' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{item.i}{item.l}</button>
               ))}
-              <div className="pt-4 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Analytics</div>
+              <div className="pt-4 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{t.dashboard}</div>
               {[
-                { t: Tab.WEEKLY, i: <TrendingUp className="w-5 h-5 mr-3" /> },
-                { t: Tab.MONTHLY, i: <BarChart3 className="w-5 h-5 mr-3" /> },
-                { t: Tab.SETTINGS, i: <Cloud className="w-5 h-5 mr-3" /> },
+                { t: Tab.WEEKLY, l: 'Weekly', i: <TrendingUp className="w-5 h-5 mr-3" /> },
+                { t: Tab.MONTHLY, l: 'Monthly', i: <BarChart3 className="w-5 h-5 mr-3" /> },
+                { t: Tab.SETTINGS, l: t.settings, i: <Cloud className="w-5 h-5 mr-3" /> },
               ].map(item => (
-                <button key={item.t} onClick={() => { triggerHaptic(); setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-indigo-600 text-white font-bold scale-105' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{item.i}{item.t}</button>
+                <button key={item.t} onClick={() => { setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-indigo-600 text-white font-bold scale-105' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{item.i}{item.l}</button>
               ))}
             </div>
           </div>
           <div className="p-4 border-t dark:border-gray-700 space-y-3">
             <button onClick={toggleDarkMode} className="w-full flex items-center justify-center p-2 rounded-lg bg-gray-100 dark:bg-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">{isDarkMode ? <Sun className="w-5 h-5 mr-2" /> : <Moon className="w-5 h-5 mr-2" />} {isDarkMode ? 'Light Mode' : 'Dark Mode'}</button>
-            <button onClick={handleLogout} className="w-full flex items-center justify-center p-2 rounded-lg bg-red-50 text-red-600 font-bold text-sm hover:bg-red-100 transition-colors"><LogOut className="w-4 h-4 mr-2" /> Log Out</button>
-            <div className="bg-green-900 rounded-xl p-4 text-white text-center shadow-lg transform transition-transform hover:scale-105"><p className="text-[10px] font-bold uppercase opacity-60 mb-1">Daily Total</p><p className="text-2xl font-black">{sales.reduce((a, b) => a + b.price, 0).toLocaleString()} ฿</p></div>
+            <button onClick={handleLogout} className="w-full flex items-center justify-center p-2 rounded-lg bg-red-50 text-red-600 font-bold text-sm hover:bg-red-100 transition-colors"><LogOut className="w-4 h-4 mr-2" /> {t.logout}</button>
+            <div className="bg-green-900 rounded-xl p-4 text-white text-center shadow-lg transform transition-transform hover:scale-105"><p className="text-[10px] font-bold uppercase opacity-60 mb-1">{t.dailyTotal}</p><p className="text-2xl font-black">{sales.reduce((a, b) => a + b.price, 0).toLocaleString()} ฿</p></div>
           </div>
         </nav>
         <main className="flex-1 overflow-y-auto p-4 md:p-8 relative bg-gray-50 dark:bg-gray-900 transition-colors duration-300">{renderContent()}</main>

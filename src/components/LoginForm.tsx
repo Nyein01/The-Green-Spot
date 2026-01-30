@@ -1,42 +1,60 @@
-import React, { useState } from 'react';
-import { Leaf, Lock, User, Loader2, Users } from 'lucide-react';
-import { triggerHaptic } from '../utils/feedback';
+import React, { useState, useEffect } from 'react';
+import { Leaf, Lock, User, Users, Check, Fingerprint, ScanLine, Globe } from 'lucide-react';
+import { translations, Language } from '../utils/translations';
 
 interface LoginFormProps {
   onLogin: (shopId: 'greenspot' | 'nearcannabis', isSuperAdmin: boolean, staffName: string) => void;
+  language: Language;
+  setLanguage: (lang: Language) => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLanguage }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const t = translations[language];
+
+  // Load saved credentials on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('gs_creds');
+    if (saved) {
+      try {
+        const { u, p } = JSON.parse(atob(saved));
+        setUsername(u);
+        setPassword(p);
+        setRememberMe(true);
+      } catch (e) {
+        localStorage.removeItem('gs_creds');
+      }
+    }
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    triggerHaptic(); // Feedback on click
     setLoading(true);
     setError('');
     
-    // Simulate network delay for a smooth feel
+    // Simulate network/scan delay
     await new Promise(resolve => setTimeout(resolve, 800));
 
     const user = username.toLowerCase().trim();
     const pass = password.trim();
+    let success = false;
 
     // Staff & Shop Logins (Password: 1234)
     if (pass === '1234') {
         if (user === 'nyein') {
             onLogin('greenspot', false, 'Staff 1 (Nyein)');
-            return;
-        }
-        if (user === 'kevin') {
+            success = true;
+        } else if (user === 'kevin') {
             onLogin('greenspot', false, 'Staff 2 (Kevin)');
-            return;
-        }
-        if (user === 'nearcannabis' || user === 'nearcanabis') {
+            success = true;
+        } else if (user === 'nearcannabis' || user === 'nearcanabis') {
             onLogin('nearcannabis', false, 'Staff (Near Cannabis)');
-            return;
+            success = true;
         }
     }
 
@@ -44,87 +62,155 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     if (pass === '0000') { 
         if (user === 'greenspot') {
             onLogin('greenspot', false, 'Manager');
-            return;
-        }
-        if (user === 'admin') {
-            onLogin('greenspot', true, 'Super Admin'); // Admin starts at greenspot but can switch
-            return;
+            success = true;
+        } else if (user === 'admin') {
+            onLogin('greenspot', true, 'Super Admin'); 
+            success = true;
         }
     }
 
-    setError("Invalid username or password.");
-    setLoading(false);
+    if (success) {
+        if (rememberMe) {
+            localStorage.setItem('gs_creds', btoa(JSON.stringify({ u: username, p: password })));
+        } else {
+            localStorage.removeItem('gs_creds');
+        }
+    } else {
+        setError(t.accessDenied);
+        setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4 transition-colors">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-gray-700">
-        <div className="bg-gradient-to-br from-green-600 to-green-700 p-8 text-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-full bg-white/5 opacity-30 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-          <div className="mx-auto w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4 backdrop-blur-md shadow-lg relative z-10">
-            <Leaf className="w-8 h-8 text-white" />
+    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden bg-[#0f172a]">
+      {/* Static Background Image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-40"
+        style={{
+            backgroundImage: `url('https://images.unsplash.com/photo-1615655114865-4cc1bda5901e?q=80&w=2574&auto=format&fit=crop')`,
+            filter: 'grayscale(100%) contrast(120%)'
+        }}
+      ></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-[#0f172a]/80 to-transparent"></div>
+
+      <style>{`
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        .animate-scan {
+            animation: scan 1.5s ease-in-out infinite;
+        }
+      `}</style>
+
+      {/* Language Switcher Top Right */}
+      <div className="absolute top-6 right-6 z-20">
+          <div className="bg-black/40 backdrop-blur-md rounded-full p-1 flex items-center border border-white/10">
+              {(['en', 'th', 'mm'] as Language[]).map(lang => (
+                  <button
+                    key={lang}
+                    onClick={() => setLanguage(lang)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${language === lang ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                  >
+                      {lang.toUpperCase()}
+                  </button>
+              ))}
           </div>
-          <h1 className="text-2xl font-bold text-white mb-1 relative z-10">POS System</h1>
-          <p className="text-green-100 text-xs font-medium relative z-10 uppercase tracking-wider">Authorized Access</p>
+      </div>
+
+      {/* Login Card */}
+      <div className="relative bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border border-white/10 z-10">
+        
+        {/* Scanner Overlay */}
+        {loading && (
+            <div className="absolute inset-0 z-50 pointer-events-none">
+                <div className="absolute left-0 right-0 h-1 bg-green-500 shadow-[0_0_20px_rgba(34,197,94,0.8)] animate-scan"></div>
+                <div className="absolute inset-0 bg-green-500/10"></div>
+            </div>
+        )}
+
+        <div className="p-8 text-center border-b border-white/10 bg-black/20">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-green-500 to-green-700 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-green-900/50">
+              <Leaf className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-white tracking-wide">{t.systemName}</h1>
+            <p className="text-gray-400 text-xs font-medium uppercase tracking-widest mt-1">{t.secureTerminal}</p>
         </div>
         
-        <div className="p-8">
+        <div className="p-8 bg-white dark:bg-gray-900">
           <form onSubmit={handleLogin} className="space-y-5">
             {error && (
-              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-medium border border-red-100 dark:border-red-800 flex items-center animate-shake">
-                <span className="mr-2">⚠️</span> {error}
+              <div className="p-3 rounded-lg bg-red-50 text-red-600 text-xs font-bold border border-red-100 flex items-center animate-shake">
+                <ScanLine className="w-4 h-4 mr-2 flex-shrink-0" /> {error}
               </div>
             )}
             
-            <div>
-              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Username</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors group-focus-within:text-green-600">
-                  <User className="h-5 w-5 text-gray-400" />
+            <div className="space-y-4">
+                <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <User className="h-5 w-5 text-gray-400 group-focus-within:text-green-600 transition-colors" />
+                    </div>
+                    <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        required
+                        disabled={loading}
+                        className="block w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all disabled:opacity-50 text-sm font-medium"
+                        placeholder={t.username}
+                    />
                 </div>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-gray-600 rounded-xl dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all bg-gray-50 dark:bg-gray-800 focus:bg-white dark:focus:bg-gray-700"
-                  placeholder="e.g., nyein, kevin"
-                />
-              </div>
+
+                <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-green-600 transition-colors" />
+                    </div>
+                    <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        disabled={loading}
+                        className="block w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all disabled:opacity-50 text-sm font-medium tracking-widest"
+                        placeholder={t.password}
+                    />
+                </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Password</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors group-focus-within:text-green-600">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-gray-600 rounded-xl dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all bg-gray-50 dark:bg-gray-800 focus:bg-white dark:focus:bg-gray-700"
-                  placeholder="Enter password"
-                />
-              </div>
+            <div className="flex items-center justify-between">
+                <label className="flex items-center space-x-2 cursor-pointer group">
+                    <div className="relative">
+                        <input 
+                            type="checkbox" 
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            className="sr-only"
+                        />
+                        <div className={`w-4 h-4 border rounded transition-colors flex items-center justify-center ${rememberMe ? 'bg-green-600 border-green-600' : 'border-gray-300 bg-white'}`}>
+                            {rememberMe && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                    </div>
+                    <span className="text-xs text-gray-500 font-medium group-hover:text-green-600 transition-colors">{t.rememberMe}</span>
+                </label>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center items-center py-4 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-70 disabled:cursor-not-allowed transition-all transform hover:-translate-y-0.5 active:scale-95"
+              className={`w-full relative overflow-hidden flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white transition-all transform hover:-translate-y-0.5 active:scale-95 ${loading ? 'bg-gray-800 cursor-wait' : 'bg-green-600 hover:bg-green-700'}`}
             >
               {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Verifying...
-                </>
+                <div className="flex items-center space-x-2">
+                  <Fingerprint className="w-5 h-5 animate-pulse text-green-200" />
+                  <span className="animate-pulse text-green-100">{t.authenticating}</span>
+                </div>
               ) : (
-                <>
-                    <Users className="w-5 h-5 mr-2" />
-                    Start Shift
-                </>
+                <div className="flex items-center space-x-2">
+                    <Users className="w-5 h-5" />
+                    <span>{t.login}</span>
+                </div>
               )}
             </button>
           </form>

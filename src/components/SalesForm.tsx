@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProductType, FlowerGrade, InventoryItem, SaleItem } from '../types';
 import { calculateFlowerPrice, formatCurrency, generateId } from '../utils/pricing';
-import { ShoppingCart, Tag, AlertCircle, Search, X, ChevronDown, Check, Loader2, PartyPopper, Banknote, QrCode, Flame, Trophy } from 'lucide-react';
-import { triggerHaptic } from '../utils/feedback';
+import { ShoppingCart, Tag, AlertCircle, Search, X, ChevronDown, Check, Banknote, QrCode } from 'lucide-react';
+import { translations, Language } from '../utils/translations';
 
 interface SalesFormProps {
   inventory: InventoryItem[];
   onSaleComplete: (sale: SaleItem) => void;
   onStockUpdate: (inventory: InventoryItem[]) => void;
   staffName: string;
+  language: Language;
 }
 
-export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete, onStockUpdate, staffName }) => {
+export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete, staffName, language }) => {
   const [productType, setProductType] = useState<ProductType>(ProductType.FLOWER);
   const [selectedStrain, setSelectedStrain] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -22,12 +23,8 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   const [isAutoPrice, setIsAutoPrice] = useState<boolean>(true);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Scan'>('Cash');
   
-  // Cool Features State
-  const [streak, setStreak] = useState(0);
-  const [showNice, setShowNice] = useState(false);
-  const [showWhale, setShowWhale] = useState(false);
-  
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const t = translations[language];
 
   // Filter inventory based on selected type and search query
   const availableItems = inventory.filter(i => 
@@ -73,22 +70,8 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    triggerHaptic();
 
     if (!selectedStrain) return alert("Please select a product.");
-
-    // Gamification Triggers
-    setStreak(prev => prev + 1);
-
-    if (price === 420) {
-        setShowNice(true);
-        setTimeout(() => setShowNice(false), 2500);
-    }
-
-    if (price >= 2000) {
-        setShowWhale(true);
-        setTimeout(() => setShowWhale(false), 3000);
-    }
 
     // Recalculate original price for data integrity
     let originalPrice = 0;
@@ -126,7 +109,6 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   };
 
   const handleTypeChange = (type: ProductType) => {
-      triggerHaptic();
       setProductType(type);
       setSelectedStrain('');
       setSearchQuery('');
@@ -135,7 +117,6 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   }
 
   const handleSelectItem = (item: InventoryItem) => {
-    triggerHaptic();
     setSelectedStrain(item.name);
     setSearchQuery(item.name);
     setIsDropdownOpen(false);
@@ -146,42 +127,14 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   return (
     <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors animate-fade-in relative overflow-hidden">
       
-      {/* 420 Overlay */}
-      {showNice && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
-              <div className="text-center animate-bounce">
-                  <h1 className="text-8xl font-black text-green-500 drop-shadow-[0_0_15px_rgba(34,197,94,0.8)]">420</h1>
-                  <p className="text-white text-2xl font-bold uppercase tracking-widest mt-4">Nice.</p>
-              </div>
-          </div>
-      )}
-
-      {/* Whale Alert Overlay */}
-      {showWhale && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-900/80 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
-              <div className="text-center">
-                  <div className="text-9xl animate-pulse">🐋</div>
-                  <h1 className="text-4xl font-black text-white mt-4">WHALE ALERT!</h1>
-                  <p className="text-blue-200 text-xl font-bold uppercase tracking-widest mt-2">Big Spender Detected</p>
-                  <p className="text-white font-mono text-3xl mt-4 bg-blue-800 inline-block px-4 py-2 rounded-lg border border-blue-400">{formatCurrency(price)}</p>
-              </div>
-          </div>
-      )}
-
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold flex items-center text-gray-800 dark:text-gray-100">
             <ShoppingCart className="w-5 h-5 mr-2 text-green-600 dark:text-green-500" />
-            New Sale
+            {t.newSale}
         </h2>
         <div className="flex items-center space-x-2">
-            {streak > 1 && (
-                <div className="flex items-center px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-lg text-xs font-bold animate-pulse">
-                    <Flame className="w-3 h-3 mr-1" />
-                    Hot Streak: {streak}
-                </div>
-            )}
             <span className="text-xs font-normal text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
-                Staff: {staffName}
+                {staffName}
             </span>
         </div>
       </div>
@@ -207,7 +160,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
 
         {/* Searchable Product Selection */}
         <div className="relative" ref={dropdownRef}>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search Product / Strain</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t.productStrain}</label>
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-gray-400 group-focus-within:text-green-500 transition-colors" />
@@ -220,7 +173,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                 setSearchQuery(e.target.value);
                 setIsDropdownOpen(true);
               }}
-              placeholder={`Type to search ${productType}...`}
+              placeholder={t.searchPlaceholder}
               className="w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm transition-all"
             />
             {searchQuery && (
@@ -259,7 +212,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                       <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-tight flex items-center mt-0.5">
                         {item.grade ? <span className="mr-2 font-bold text-blue-500 dark:text-blue-400">{item.grade}</span> : null}
                         {item.price ? <span className="mr-2">{item.price} ฿</span> : null}
-                        <span>Stock: {item.stockLevel} {productType === ProductType.FLOWER ? 'g' : 'pcs'}</span>
+                        <span>{t.stock}: {item.stockLevel} {productType === ProductType.FLOWER ? 'g' : 'pcs'}</span>
                       </div>
                     </div>
                     <ChevronDown className="w-4 h-4 text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -270,17 +223,16 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
           )}
         </div>
 
-        {/* Flower Specifics: Grade (Syncs with selected item but allows override if needed) */}
+        {/* Flower Specifics: Grade */}
         {productType === ProductType.FLOWER && (
           <div className="animate-in fade-in slide-in-from-left-2 duration-300">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Grade</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t.grade}</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {Object.values(FlowerGrade).map((g) => (
                 <button
                   key={g}
                   type="button"
                   onClick={() => {
-                    triggerHaptic();
                     setGrade(g);
                     setIsAutoPrice(true);
                   }}
@@ -300,13 +252,12 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
         {/* Quantity */}
         <div className="animate-in fade-in slide-in-from-left-2 duration-300 delay-75">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Quantity {productType === ProductType.FLOWER ? '(grams)' : '(units)'}
+            {t.quantity} {productType === ProductType.FLOWER ? '(grams)' : '(units)'}
           </label>
           <div className="flex items-center space-x-2">
             <button
               type="button"
               onClick={() => {
-                triggerHaptic();
                 setQuantity(Math.max(productType === ProductType.FLOWER ? 0.5 : 1, quantity - (productType === ProductType.FLOWER ? 0.5 : 1)));
               }}
               className="p-3 sm:p-2 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 touch-manipulation transition-colors"
@@ -323,7 +274,6 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
             <button
               type="button"
               onClick={() => {
-                triggerHaptic();
                 setQuantity(quantity + (productType === ProductType.FLOWER ? 0.5 : 1));
               }}
               className="p-3 sm:p-2 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 touch-manipulation transition-colors"
@@ -336,17 +286,16 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
         {/* Price & Negotiation */}
         <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-600 animate-in fade-in slide-in-from-left-2 duration-300 delay-100">
           <div className="flex justify-between items-center mb-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Price</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.totalPrice}</label>
             <button
               type="button"
               onClick={() => {
-                  triggerHaptic();
                   setIsAutoPrice(!isAutoPrice);
               }}
               className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center p-1"
             >
               <Tag className="w-3 h-3 mr-1" />
-              {isAutoPrice ? 'Manual Adjustment' : 'Revert to Auto'}
+              {isAutoPrice ? t.manualAdjustment : t.revertAuto}
             </button>
           </div>
           <div className="flex items-center relative">
@@ -362,33 +311,22 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                   : 'bg-white dark:bg-gray-800 border-blue-300 dark:border-blue-500 text-blue-600 dark:text-blue-400 focus:ring-blue-500 shadow-inner'
               }`}
             />
-            {price === 420 && !showNice && (
-                <div className="absolute right-3 animate-bounce">
-                    <span className="text-lg">🌿</span>
-                </div>
-            )}
           </div>
-          {price === 420 ? (
-             <p className="text-xs font-bold text-green-600 dark:text-green-400 mt-1 flex items-center animate-pulse">
-                <PartyPopper className="w-3 h-3 mr-1" />
-                Perfect.
-             </p>
-          ) : !isAutoPrice && (
+          {!isAutoPrice && (
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center animate-pulse">
               <AlertCircle className="w-3 h-3 mr-1" />
-              Price manually adjusted
+              {t.manualAdjustment}
             </p>
           )}
         </div>
 
         {/* Payment Method Selector */}
         <div className="animate-in fade-in slide-in-from-left-2 duration-300 delay-150">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Payment Method</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t.paymentMethod}</label>
             <div className="grid grid-cols-2 gap-3">
                 <button
                     type="button"
                     onClick={() => {
-                        triggerHaptic();
                         setPaymentMethod('Cash');
                     }}
                     className={`flex items-center justify-center p-3 rounded-lg border transition-all ${
@@ -398,12 +336,11 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                     }`}
                 >
                     <Banknote className="w-5 h-5 mr-2" />
-                    <span className="font-bold">Cash</span>
+                    <span className="font-bold">{t.cash}</span>
                 </button>
                 <button
                     type="button"
                     onClick={() => {
-                        triggerHaptic();
                         setPaymentMethod('Scan');
                     }}
                     className={`flex items-center justify-center p-3 rounded-lg border transition-all ${
@@ -413,7 +350,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                     }`}
                 >
                     <QrCode className="w-5 h-5 mr-2" />
-                    <span className="font-bold">Scan</span>
+                    <span className="font-bold">{t.scan}</span>
                 </button>
             </div>
         </div>
@@ -423,8 +360,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
           disabled={!selectedStrain}
           className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:scale-95 touch-manipulation disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed flex items-center justify-center"
         >
-          {streak > 2 ? <Flame className="w-5 h-5 mr-2 animate-bounce" /> : null}
-          Confirm Sale
+          {t.confirmSale}
         </button>
       </form>
     </div>
