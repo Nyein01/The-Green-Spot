@@ -22,6 +22,7 @@
         background-color: #f3f4f6;
         /* Prevent pull-to-refresh on mobile to feel like an app */
         overscroll-behavior-y: none;
+        transition: background-image 0.5s ease-in-out, background-color 0.5s ease-in-out;
       }
       /* Custom scrollbar for receipt view */
       .receipt-scroll::-webkit-scrollbar {
@@ -31,6 +32,111 @@
         background-color: #cbd5e1;
         border-radius: 4px;
       }
+
+      /* --- THEME OVERRIDES --- */
+
+      /* Daylight: Default Tailwind Gray-100 */
+      html.daylight body {
+        background-color: #f3f4f6;
+      }
+
+      /* Midnight: Deep Dark Blue */
+      html.midnight body {
+        background-color: #0f172a;
+      }
+
+      /* Sunset: Warm Gradient */
+      html.sunset body {
+        background: linear-gradient(135deg, #fff1eb 0%, #ace0f9 100%); /* Soft warm sky */
+        background: linear-gradient(to bottom right, #ffedd5, #ffe4e6, #fff1f2);
+        min-height: 100vh;
+      }
+      html.sunset .bg-white {
+        background-color: rgba(255, 255, 255, 0.85) !important;
+        backdrop-filter: blur(12px);
+      }
+
+      /* Ocean: Cool Blue Gradient */
+      html.ocean body {
+        background: linear-gradient(to bottom right, #ecfeff, #cffafe, #dbeafe);
+        min-height: 100vh;
+      }
+      html.ocean .bg-white {
+        background-color: rgba(255, 255, 255, 0.85) !important;
+        backdrop-filter: blur(12px);
+      }
+
+      /* Minimal: Flat Gray */
+      html.minimal body {
+        background-color: #e5e7eb;
+      }
+      html.minimal .rounded-xl, 
+      html.minimal .rounded-lg,
+      html.minimal .rounded-2xl {
+        border-radius: 4px !important;
+      }
+      html.minimal .shadow-sm, 
+      html.minimal .shadow-lg,
+      html.minimal .shadow-xl {
+        box-shadow: none !important;
+        border: 1px solid #d1d5db !important;
+      }
+
+      /* Glass: Premium Dark Blur */
+      html.glass body {
+        background-image: url('https://images.unsplash.com/photo-1492011221367-f47e3ccd77a0?q=80&w=1974&auto=format&fit=crop');
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+      }
+
+      /* Base transparency for main containers */
+      html.glass .bg-white,
+      html.glass .bg-gray-50,
+      html.glass .dark\:bg-gray-800,
+      html.glass .dark\:bg-gray-900,
+      html.glass nav {
+        background-color: rgba(16, 22, 35, 0.75) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37) !important;
+      }
+
+      /* Text readability overrides */
+      html.glass .text-gray-900,
+      html.glass .text-gray-800,
+      html.glass .text-gray-700,
+      html.glass .text-gray-600 {
+        color: #f3f4f6 !important;
+      }
+      html.glass .text-gray-500, 
+      html.glass .text-gray-400 {
+        color: #9ca3af !important;
+      }
+
+      /* Input fields specific overrides */
+      html.glass input,
+      html.glass select,
+      html.glass textarea {
+        background-color: rgba(0, 0, 0, 0.4) !important;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+        color: #fff !important;
+      }
+      
+      /* Fix hover states on list items */
+      html.glass .hover\:bg-gray-50:hover,
+      html.glass .dark\:hover\:bg-gray-700\/50:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+      }
+
+      html.glass ::-webkit-scrollbar-thumb {
+        background-color: rgba(255,255,255,0.2);
+      }
+      html.glass ::-webkit-scrollbar-track {
+        background-color: transparent;
+      }
+
     </style>
 <script type="importmap">
 {

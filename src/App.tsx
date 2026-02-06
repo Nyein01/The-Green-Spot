@@ -19,7 +19,13 @@ import {
   Loader2,
   UserCircle2,
   Globe,
-  Check
+  Check,
+  Palette,
+  CloudRain,
+  Droplets,
+  Circle,
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 import { LoginForm } from './components/LoginForm';
 import { SalesForm } from './components/SalesForm';
@@ -51,6 +57,7 @@ import { generateId } from './utils/pricing';
 import { translations, Language } from './utils/translations';
 
 type ShopId = 'greenspot' | 'nearcannabis';
+type Theme = 'daylight' | 'midnight' | 'sunset' | 'ocean' | 'minimal' | 'glass';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -72,7 +79,7 @@ const App: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [theme, setTheme] = useState<Theme>('daylight');
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
@@ -89,19 +96,35 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // Check local storage for theme & language
-    const savedTheme = localStorage.getItem('greentrack_theme');
+    const savedTheme = localStorage.getItem('greentrack_theme') as Theme;
     const savedLang = localStorage.getItem('greentrack_lang') as Language;
     
-    if (savedTheme === 'dark') {
-      setIsDarkMode(true);
-    } else if (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setIsDarkMode(true);
+    if (savedTheme) {
+      setTheme(savedTheme);
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setTheme('midnight');
     }
 
     if (savedLang) {
         setLanguage(savedLang);
     }
   }, []);
+
+  // Apply Theme Classes to HTML root
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.className = ''; // Clear all
+    
+    // Always add 'dark' class for midnight and glass themes to trigger tailwind dark mode text/colors
+    if (theme === 'midnight' || theme === 'glass') {
+      root.classList.add('dark');
+    }
+    
+    // Add specific theme class for global CSS overrides
+    root.classList.add(theme);
+    
+    localStorage.setItem('greentrack_theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -129,12 +152,6 @@ const App: React.FC = () => {
       window.removeEventListener('offline', handleOffline);
     };
   }, [currentShop, isAuthenticated]);
-
-  const toggleDarkMode = () => {
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    localStorage.setItem('greentrack_theme', newMode ? 'dark' : 'light');
-  };
 
   const changeLanguage = (lang: Language) => {
       setLanguage(lang);
@@ -259,6 +276,15 @@ const App: React.FC = () => {
 
   if (!isAuthenticated) return <LoginForm onLogin={handleLogin} language={language} setLanguage={changeLanguage} />;
 
+  const themeOptions = [
+    { id: 'daylight', name: 'Daylight', desc: 'Bright and airy with soft gradients.', icon: Sun, bg: 'bg-orange-50' },
+    { id: 'midnight', name: 'Midnight', desc: 'Dark, deep tones for night shifts.', icon: Moon, bg: 'bg-slate-900 text-white' },
+    { id: 'glass', name: 'Glass UI', desc: 'Futuristic frosted glass aesthetic.', icon: Sparkles, bg: 'bg-slate-800 text-white' },
+    { id: 'sunset', name: 'Sunset', desc: 'Warm colors inspired by the evening sky.', icon: CloudRain, bg: 'bg-orange-100' },
+    { id: 'ocean', name: 'Ocean', desc: 'Calm blue tones for a relaxed vibe.', icon: Droplets, bg: 'bg-cyan-100' },
+    { id: 'minimal', name: 'Minimal', desc: 'Clean, solid grey for maximum focus.', icon: Circle, bg: 'bg-gray-100' }
+  ];
+
   const renderContent = () => {
     if (loading) return <div className="flex h-full items-center justify-center text-green-600"><Loader2 className="animate-spin h-10 w-10" /></div>;
 
@@ -303,68 +329,121 @@ const App: React.FC = () => {
         return <div className={contentClass}><HistoricalReport archivedReports={reports} inventory={inventory} timeframe="monthly" shopName={shopNames[currentShop]} /></div>;
       case Tab.SETTINGS:
         return (
-          <div className={`max-w-md mx-auto bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm pb-20 dark:border-gray-700 border ${contentClass}`}>
-            <h2 className="text-xl font-bold mb-6 dark:text-white">{t.settings}</h2>
-            <div className="space-y-4">
+          <div className={`max-w-4xl mx-auto ${contentClass}`}>
+            <h2 className="text-3xl font-extrabold mb-1 dark:text-white">{t.settings}</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-8">Customize your app experience</p>
+            
+            <div className="space-y-8">
               
+              {/* Theme Switcher Grid */}
+              <div className="bg-white/50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
+                  <div className="flex items-center text-gray-800 dark:text-white mb-6 font-bold text-lg">
+                    <Palette className="w-6 h-6 mr-2 text-purple-600" />
+                    App Appearance
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {themeOptions.map((opt) => {
+                      const Icon = opt.icon;
+                      const isSelected = theme === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={() => setTheme(opt.id as Theme)}
+                          className={`relative flex items-start p-4 rounded-xl border-2 transition-all duration-200 text-left group ${
+                            isSelected 
+                              ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-900/20' 
+                              : 'border-transparent bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-200 dark:hover:border-gray-600 shadow-sm'
+                          }`}
+                        >
+                          <div className={`p-3 rounded-full mr-4 ${opt.bg} ${isSelected ? 'ring-2 ring-purple-200 dark:ring-purple-800' : ''}`}>
+                             <Icon className={`w-6 h-6 ${opt.id === 'midnight' || opt.id === 'glass' ? 'text-gray-200' : 'text-gray-700'}`} />
+                          </div>
+                          <div className="flex-1">
+                             <div className="flex justify-between items-center mb-1">
+                                <h3 className={`font-bold text-base ${isSelected ? 'text-purple-700 dark:text-purple-300' : 'text-gray-900 dark:text-gray-100'}`}>{opt.name}</h3>
+                                {isSelected && <CheckCircle2 className="w-5 h-5 text-purple-600 fill-purple-100 dark:fill-purple-900" />}
+                             </div>
+                             <p className="text-xs text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
+                                {opt.desc}
+                             </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+              </div>
+
               {/* Language Selector */}
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-                  <div className="flex items-center text-gray-800 dark:text-white mb-3 font-bold">
-                    <Globe className="w-5 h-5 mr-2" />
+              <div className="bg-white/50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
+                  <div className="flex items-center text-gray-800 dark:text-white mb-4 font-bold text-lg">
+                    <Globe className="w-6 h-6 mr-2 text-blue-600" />
                     {t.language}
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-3">
                     <button 
                         onClick={() => changeLanguage('en')}
-                        className={`p-2 rounded-lg text-sm font-medium transition-colors ${language === 'en' ? 'bg-green-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}
+                        className={`p-3 rounded-xl text-sm font-bold transition-colors border-2 ${language === 'en' ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-transparent bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 shadow-sm hover:bg-gray-50'}`}
                     >
                         English
                     </button>
                     <button 
                         onClick={() => changeLanguage('th')}
-                        className={`p-2 rounded-lg text-sm font-medium transition-colors ${language === 'th' ? 'bg-green-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}
+                        className={`p-3 rounded-xl text-sm font-bold transition-colors border-2 ${language === 'th' ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-transparent bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 shadow-sm hover:bg-gray-50'}`}
                     >
                         ไทย
                     </button>
                     <button 
                         onClick={() => changeLanguage('mm')}
-                        className={`p-2 rounded-lg text-sm font-medium transition-colors ${language === 'mm' ? 'bg-green-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}
+                        className={`p-3 rounded-xl text-sm font-bold transition-colors border-2 ${language === 'mm' ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-transparent bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 shadow-sm hover:bg-gray-50'}`}
                     >
                         မြန်မာ
                     </button>
                   </div>
               </div>
 
-              <div className={`p-4 rounded-lg border transition-all duration-500 ${
-                isOnline 
-                  ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800' 
-                  : 'bg-orange-50 border-orange-200 dark:bg-orange-900/30 dark:border-orange-800'
-              }`}>
-                <div className={`flex items-center font-bold mb-2 ${
+              {/* Data Management */}
+              <div className="bg-white/50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
+                <div className="flex items-center text-gray-800 dark:text-white mb-4 font-bold text-lg">
+                    <Database className="w-6 h-6 mr-2 text-green-600" />
+                    Data & Cloud
+                </div>
+                <div className={`p-4 rounded-xl border mb-4 transition-all duration-500 ${
                     isOnline 
-                    ? 'text-blue-900 dark:text-blue-100' 
-                    : 'text-orange-900 dark:text-orange-100'
+                    ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+                    : 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800'
                 }`}>
-                    {isOnline ? <Wifi className="w-5 h-5 mr-2" /> : <WifiOff className="w-5 h-5 mr-2" />} 
-                    {t.cloudStatus}: {isOnline ? t.connected : t.offline}
+                    <div className={`flex items-center font-bold mb-1 ${
+                        isOnline 
+                        ? 'text-green-800 dark:text-green-300' 
+                        : 'text-orange-800 dark:text-orange-300'
+                    }`}>
+                        {isOnline ? <Wifi className="w-5 h-5 mr-2" /> : <WifiOff className="w-5 h-5 mr-2" />} 
+                        {t.cloudStatus}: {isOnline ? t.connected : t.offline}
+                    </div>
+                    <p className="text-xs opacity-80">
+                        {isOnline ? "Your data is automatically synced securely." : "Changes are saved locally and will sync when online."}
+                    </p>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button 
+                        onClick={handleMigrate} 
+                        className="flex items-center justify-center p-3 bg-white dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-600 transition-all text-gray-700 dark:text-gray-200 shadow-sm"
+                    >
+                        <Cloud className="w-4 h-4 mr-2" /> {t.migrateData}
+                    </button>
+
+                    {inventory.length === 0 && (
+                        <button 
+                            onClick={handleSeed} 
+                            className="flex items-center justify-center p-3 bg-white dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-600 transition-all text-gray-700 dark:text-gray-200 shadow-sm"
+                        >
+                            <Package className="w-4 h-4 mr-2" /> {t.loadDefault}
+                        </button>
+                    )}
                 </div>
               </div>
-              
-              <button 
-                  onClick={handleMigrate} 
-                  className="group w-full flex items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 text-sm font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-700 hover:text-blue-700 dark:hover:text-blue-300 transition-all text-gray-700 dark:text-gray-200"
-              >
-                  <Cloud className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" /> {t.migrateData}
-              </button>
-
-              {inventory.length === 0 && (
-                  <button 
-                    onClick={handleSeed} 
-                    className="group w-full flex items-center justify-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 text-sm font-medium hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-200 dark:hover:border-green-700 hover:text-green-700 dark:hover:text-green-300 transition-all text-gray-700 dark:text-gray-200"
-                  >
-                      <Database className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" /> {t.loadDefault}
-                  </button>
-              )}
             </div>
           </div>
         );
@@ -373,7 +452,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`${isDarkMode ? 'dark' : ''}`}>
+    <div className={`${theme === 'midnight' ? 'dark' : ''}`}>
       <style>{`
         @keyframes slideInUp {
           from { opacity: 0; transform: translateY(15px); }
@@ -390,7 +469,7 @@ const App: React.FC = () => {
           animation: fadeIn 0.3s ease-out forwards;
         }
       `}</style>
-      <div className="h-screen w-full bg-gray-100 dark:bg-gray-900 flex flex-col md:flex-row overflow-hidden transition-colors duration-300">
+      <div className="h-screen w-full bg-transparent flex flex-col md:flex-row overflow-hidden transition-colors duration-300">
         <div className="md:hidden bg-white dark:bg-gray-800 p-4 shadow-sm flex justify-between items-center z-20 border-b dark:border-gray-700">
           <div className="flex items-center"><Leaf className="w-6 h-6 text-green-600 mr-2" /><span className="font-bold text-lg dark:text-white">{shopNames[currentShop]}</span></div>
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2">{isMobileMenuOpen ? <X /> : <Menu />}</button>
@@ -434,12 +513,11 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="p-4 border-t dark:border-gray-700 space-y-3">
-            <button onClick={toggleDarkMode} className="w-full flex items-center justify-center p-2 rounded-lg bg-gray-100 dark:bg-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">{isDarkMode ? <Sun className="w-5 h-5 mr-2" /> : <Moon className="w-5 h-5 mr-2" />} {isDarkMode ? 'Light Mode' : 'Dark Mode'}</button>
             <button onClick={handleLogout} className="w-full flex items-center justify-center p-2 rounded-lg bg-red-50 text-red-600 font-bold text-sm hover:bg-red-100 transition-colors"><LogOut className="w-4 h-4 mr-2" /> {t.logout}</button>
             <div className="bg-green-900 rounded-xl p-4 text-white text-center shadow-lg transform transition-transform hover:scale-105"><p className="text-[10px] font-bold uppercase opacity-60 mb-1">{t.dailyTotal}</p><p className="text-2xl font-black">{sales.reduce((a, b) => a + b.price, 0).toLocaleString()} ฿</p></div>
           </div>
         </nav>
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 relative bg-gray-50 dark:bg-gray-900 transition-colors duration-300">{renderContent()}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 relative transition-colors duration-300">{renderContent()}</main>
         {isMobileMenuOpen && <div className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>}
       </div>
     </div>
