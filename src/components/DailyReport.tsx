@@ -18,8 +18,7 @@ import {
   Plus,
   Banknote,
   QrCode,
-  AlertTriangle,
-  RefreshCw
+  UserCircle
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
@@ -47,7 +46,7 @@ export const DailyReport: React.FC<DailyReportProps> = ({
   onReset, 
   deletingIds, 
   shopName, 
-  staffName 
+  staffName
 }) => {
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
@@ -92,7 +91,6 @@ export const DailyReport: React.FC<DailyReportProps> = ({
     
     if (success) {
         setReportSaved(true);
-        // Do NOT auto hide the success state immediately, so the user knows they can now close shift
         alert("✅ Daily report saved to Archives!\nYou can now safely Close Shift.");
     } else {
         alert("Failed to save report. Please check connection.");
@@ -148,13 +146,9 @@ export const DailyReport: React.FC<DailyReportProps> = ({
     setDownloadingPdf(true);
 
     try {
-      // 1. Create a dedicated off-screen container for the PDF
-      // This allows us to style it specifically for A4 paper (Cleaner, more corporate)
-      // instead of just screenshotting the receipt view.
       const printContainer = document.createElement('div');
       printContainer.id = 'pdf-print-container';
       
-      // Force desktop-like width and specific styling for the report
       Object.assign(printContainer.style, {
         position: 'fixed',
         top: '-10000px', // Hide off-screen
@@ -166,14 +160,10 @@ export const DailyReport: React.FC<DailyReportProps> = ({
         padding: '60px'
       });
 
-      // 2. Prepare Data
       const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       const timeStr = new Date().toLocaleTimeString();
       const netProfit = totalRevenue - totalExpenses;
 
-      // 3. Build HTML Structure
-
-      // Sales Table Rows
       const salesRowsHtml = sales.map((sale, index) => {
           const isOdd = index % 2 !== 0;
           return `
@@ -194,7 +184,6 @@ export const DailyReport: React.FC<DailyReportProps> = ({
           `;
       }).join('');
 
-      // Expenses Table
       const expensesHtml = expenses.length > 0 ? `
         <div style="margin-top: 40px;">
             <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; color: #b91c1c; margin-bottom: 15px; border-bottom: 2px solid #b91c1c; padding-bottom: 8px; display: inline-block;">
@@ -226,12 +215,12 @@ export const DailyReport: React.FC<DailyReportProps> = ({
                 <h1 style="font-size: 48px; font-weight: 900; letter-spacing: -0.02em; margin: 0; color: #111827; line-height: 1;">${shopName}</h1>
                 <div style="display: flex; align-items: center; margin-top: 12px;">
                     <div style="background-color: #111827; color: white; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-right: 12px;">Daily Sales Report</div>
-                    <div style="color: #6b7280; font-size: 14px; font-weight: 500;">Authorized by: ${staffName}</div>
+                    <div style="color: #6b7280; font-size: 14px; font-weight: 500;">Staff: ${staffName}</div>
                 </div>
             </div>
             <div style="text-align: right;">
                 <div style="font-size: 28px; font-weight: 800; color: #111827;">${dateStr}</div>
-                <div style="font-size: 14px; color: #6b7280; margin-top: 4px; font-weight: 500;">Generated at ${timeStr}</div>
+                <div style="font-size: 14px; color: #6b7280; margin-top: 4px; font-weight: 500;">Report Generated: ${timeStr}</div>
             </div>
         </div>
 
@@ -291,7 +280,6 @@ export const DailyReport: React.FC<DailyReportProps> = ({
         </div>
       `;
 
-      // 4. Append, Capture, and Generate
       document.body.appendChild(printContainer);
 
       const canvas = await html2canvas(printContainer, {
@@ -300,10 +288,8 @@ export const DailyReport: React.FC<DailyReportProps> = ({
         backgroundColor: '#ffffff'
       });
 
-      // Cleanup DOM
       document.body.removeChild(printContainer);
 
-      // Create PDF
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -319,11 +305,9 @@ export const DailyReport: React.FC<DailyReportProps> = ({
       let heightLeft = imgHeight;
       let position = 0;
 
-      // Add first page
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pdfHeight;
 
-      // Add subsequent pages if content is long
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
@@ -500,26 +484,25 @@ export const DailyReport: React.FC<DailyReportProps> = ({
                     <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg mr-3 text-orange-600 dark:text-orange-400">
                         <Wallet className="w-5 h-5" />
                     </div>
-                    Expenses
+                    Expenses List
                 </h3>
-                <span className="text-xs font-semibold bg-orange-100 text-orange-800 px-2 py-1 rounded">Internal Use</span>
             </div>
             
             {/* Add Expense Form */}
             <form onSubmit={handleNewExpense} className="flex gap-2 mb-4">
                 <input 
                     type="text" 
-                    placeholder="Item (e.g. Food, Ice)" 
+                    placeholder="Expense Description (e.g. Lunch)" 
                     value={expDesc}
                     onChange={e => setExpDesc(e.target.value)}
                     className="flex-1 text-sm p-2 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
                 <input 
                     type="number" 
-                    placeholder="Cost" 
+                    placeholder="Amount" 
                     value={expAmount}
                     onChange={e => setExpAmount(e.target.value)}
-                    className="w-20 text-sm p-2 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-24 text-sm p-2 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
                 <button 
                     type="submit"
@@ -551,13 +534,6 @@ export const DailyReport: React.FC<DailyReportProps> = ({
                     ))
                 )}
             </div>
-            
-            {expenses.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-dashed border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                    <span className="text-xs font-bold text-gray-500 uppercase">Total Expenses</span>
-                    <span className="text-sm font-black text-orange-600 dark:text-orange-400">{formatCurrency(totalExpenses)}</span>
-                </div>
-            )}
         </div>
 
         {/* Save & Archive Section */}

@@ -83,15 +83,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden bg-[#0f172a]">
-      {/* Static Background Image */}
+      {/* Rick and Morty Space Background */}
       <div 
-        className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-40"
+        className="absolute inset-0 bg-cover bg-center pointer-events-none"
         style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1615655114865-4cc1bda5901e?q=80&w=2574&auto=format&fit=crop')`,
-            filter: 'grayscale(100%) contrast(120%)'
+            backgroundImage: `url('https://wallpaperaccess.com/full/159512.jpg')`,
+            opacity: 0.6
         }}
       ></div>
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-[#0f172a]/80 to-transparent"></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent"></div>
 
       <style>{`
         @keyframes scan {
@@ -107,12 +107,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
 
       {/* Language Switcher Top Right */}
       <div className="absolute top-6 right-6 z-20">
-          <div className="bg-black/40 backdrop-blur-md rounded-full p-1 flex items-center border border-white/10">
+          <div className="bg-black/60 backdrop-blur-md rounded-full p-1 flex items-center border border-white/10 shadow-lg">
               {(['en', 'th', 'mm'] as Language[]).map(lang => (
                   <button
                     key={lang}
                     onClick={() => setLanguage(lang)}
-                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${language === lang ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${language === lang ? 'bg-green-600 text-white' : 'text-gray-300 hover:text-white'}`}
                   >
                       {lang.toUpperCase()}
                   </button>
@@ -121,7 +121,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
       </div>
 
       {/* Login Card */}
-      <div className="relative bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border border-white/10 z-10">
+      <div className="relative bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border border-white/10 z-10 ring-1 ring-white/5">
         
         {/* Scanner Overlay */}
         {loading && (
@@ -131,7 +131,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
             </div>
         )}
 
-        <div className="p-8 text-center border-b border-white/10 bg-black/20">
+        <div className="p-8 text-center border-b border-white/10 bg-black/40">
             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-green-500 to-green-700 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-green-900/50">
               <Leaf className="w-8 h-8 text-white" />
             </div>
@@ -139,7 +139,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
             <p className="text-gray-400 text-xs font-medium uppercase tracking-widest mt-1">{t.secureTerminal}</p>
         </div>
         
-        <div className="p-8 bg-white dark:bg-gray-900">
+        <div className="p-8 bg-white dark:bg-gray-900/80 backdrop-blur-sm">
           <form onSubmit={handleLogin} className="space-y-5">
             {error && (
               <div className="p-3 rounded-lg bg-red-50 text-red-600 text-xs font-bold border border-red-100 flex items-center animate-shake">

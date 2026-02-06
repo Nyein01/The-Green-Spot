@@ -56,6 +56,8 @@ export interface DayReport {
   expenses?: Expense[];
   timestamp: number;
   closedBy?: string;
+  shiftStartTime?: number;
+  shiftEndTime?: number;
 }
 
 export enum Tab {

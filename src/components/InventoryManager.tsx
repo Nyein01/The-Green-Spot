@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { InventoryItem, ProductType, FlowerGrade } from '../types';
-import { Plus, Edit2, Save, X, ClipboardList, Minus, ShoppingCart, ArrowLeft, FileSpreadsheet, FileText, Loader2, ChevronUp, ChevronDown, ArrowUpDown, Leaf, Flame, Utensils, Zap, Package, Search, Trash2, CheckCircle2 } from 'lucide-react';
+import { Plus, Edit2, Save, X, ClipboardList, Minus, ShoppingCart, ArrowLeft, FileSpreadsheet, FileText, Loader2, ChevronUp, ChevronDown, ChevronRight, ArrowUpDown, Leaf, Flame, Utensils, Zap, Package, Search, Trash2, CheckCircle2 } from 'lucide-react';
 import { generateId } from '../utils/pricing';
 import { generateInventoryAnalysis } from '../services/geminiService';
 import { jsPDF } from "jspdf";
@@ -27,6 +27,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   
   const t = translations[language];
 
@@ -70,6 +71,16 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
       setSortField(field);
       setSortDirection('asc');
     }
+  };
+
+  const toggleCategory = (category: string) => {
+    const newCollapsed = new Set(collapsedCategories);
+    if (newCollapsed.has(category)) {
+      newCollapsed.delete(category);
+    } else {
+      newCollapsed.add(category);
+    }
+    setCollapsedCategories(newCollapsed);
   };
 
   // Grade Weight for sorting (Higher number = Better grade)
@@ -168,8 +179,6 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
   };
 
   const handleExportPDF = async () => {
-    // ... (PDF logic remains same, can enhance with language later if needed)
-    // For brevity, keeping English for PDF report as it's often a standard
     if (inventory.length === 0) {
       alert("Inventory is empty.");
       return;
@@ -463,60 +472,88 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
       </div>
 
       {isAdding && isSuperAdmin && (
-        <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/30 animate-in slide-in-from-top-4 duration-300">
-          <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-3">{editingId ? t.editProduct : t.addNewProduct}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
-            <div className="lg:col-span-2">
-                <input 
-                type="text" 
-                placeholder={t.productName}
-                value={formState.name || ''}
-                onChange={e => setFormState({...formState, name: e.target.value})}
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md text-sm outline-none focus:border-blue-500 transition-all"
-                />
-            </div>
-            <select 
-              value={formState.category}
-              onChange={e => setFormState({...formState, category: e.target.value as ProductType})}
-              className="p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md text-sm outline-none focus:border-blue-500 transition-all"
-            >
-              {availableCategories.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            
-            {formState.category === ProductType.FLOWER ? (
-              <select 
-                value={formState.grade}
-                onChange={e => setFormState({...formState, grade: e.target.value as FlowerGrade})}
-                className="p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md text-sm outline-none focus:border-blue-500 transition-all"
-              >
-                {Object.values(FlowerGrade).map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            ) : (
-                <input 
-                type="number" 
-                placeholder="Unit Price (฿)" 
-                value={formState.price || ''}
-                onChange={e => setFormState({...formState, price: parseFloat(e.target.value)})}
-                className="p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md text-sm outline-none focus:border-blue-500 transition-all"
-                />
-            )}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={resetForm}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-700/50">
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center">
+                        {editingId ? <Edit2 className="w-5 h-5 mr-2 text-blue-500" /> : <Plus className="w-5 h-5 mr-2 text-green-500" />}
+                        {editingId ? t.editProduct : t.addNewProduct}
+                    </h3>
+                    <button onClick={resetForm} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X className="w-5 h-5" /></button>
+                </div>
+                
+                <div className="p-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+                        <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t.productName}</label>
+                            <input 
+                            type="text" 
+                            placeholder="e.g. Blue Dream"
+                            value={formState.name || ''}
+                            onChange={e => setFormState({...formState, name: e.target.value})}
+                            className="w-full p-2.5 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                            autoFocus
+                            />
+                        </div>
 
-            <input 
-              type="number" 
-              placeholder={t.currentStock}
-              value={formState.stockLevel}
-              onChange={e => setFormState({...formState, stockLevel: parseFloat(e.target.value)})}
-              className="p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md text-sm outline-none focus:border-blue-500 transition-all"
-            />
-          </div>
-          <div className="flex space-x-2">
-            <button onClick={handleSave} className="flex items-center bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-blue-700 transition-colors shadow-sm">
-              <Save className="w-3 h-3 mr-1" /> {t.save}
-            </button>
-            <button onClick={resetForm} className="flex items-center bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-200 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm">
-              <X className="w-3 h-3 mr-1" /> {t.cancel}
-            </button>
-          </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t.category}</label>
+                            <select 
+                            value={formState.category}
+                            onChange={e => setFormState({...formState, category: e.target.value as ProductType})}
+                            className="w-full p-2.5 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                            >
+                            {availableCategories.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </div>
+                        
+                        {formState.category === ProductType.FLOWER ? (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t.grade}</label>
+                            <select 
+                                value={formState.grade}
+                                onChange={e => setFormState({...formState, grade: e.target.value as FlowerGrade})}
+                                className="w-full p-2.5 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                            >
+                                {Object.values(FlowerGrade).map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                        </div>
+                        ) : (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unit Price (฿)</label>
+                                <input 
+                                type="number" 
+                                placeholder="0" 
+                                value={formState.price || ''}
+                                onChange={e => setFormState({...formState, price: parseFloat(e.target.value)})}
+                                className="w-full p-2.5 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                />
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t.currentStock}</label>
+                            <input 
+                            type="number" 
+                            placeholder="0"
+                            value={formState.stockLevel}
+                            onChange={e => setFormState({...formState, stockLevel: parseFloat(e.target.value)})}
+                            className="w-full p-2.5 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="flex justify-end space-x-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+                        <button onClick={resetForm} className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                            {t.cancel}
+                        </button>
+                        <button onClick={handleSave} className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 shadow-md shadow-green-200 dark:shadow-none transition-all transform active:scale-95">
+                            <Save className="w-4 h-4 mr-2" /> 
+                            {t.save}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
       )}
 
@@ -573,20 +610,30 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
               Object.entries(groupedInventory).map(([category, items]) => {
                 const inventoryItems = items as InventoryItem[];
                 if (inventoryItems.length === 0) return null;
+                const isCollapsed = collapsedCategories.has(category);
                 
                 return (
                   <React.Fragment key={category}>
-                    {/* Group Header Row */}
-                    <tr className={`${getCategoryColor(category as ProductType)} border-y dark:border-gray-700`}>
-                      <td colSpan={isSuperAdmin ? 5 : 4} className="px-4 py-2 font-bold uppercase tracking-widest text-[11px] flex items-center">
-                        {getCategoryIcon(category as ProductType)}
-                        {category} ({inventoryItems.length})
+                    {/* Collapsible Group Header Row */}
+                    <tr 
+                      onClick={() => toggleCategory(category)}
+                      className={`${getCategoryColor(category as ProductType)} border-y dark:border-gray-700 cursor-pointer hover:brightness-95 transition-all`}
+                    >
+                      <td colSpan={isSuperAdmin ? 5 : 4} className="px-4 py-2">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center font-bold uppercase tracking-widest text-[11px]">
+                                {getCategoryIcon(category as ProductType)}
+                                <span className="mr-2">{category}</span>
+                                <span className="bg-white/50 dark:bg-black/20 px-2 py-0.5 rounded-full text-[10px]">{inventoryItems.length}</span>
+                            </div>
+                            {isCollapsed ? <ChevronRight className="w-4 h-4 opacity-50" /> : <ChevronDown className="w-4 h-4 opacity-50" />}
+                        </div>
                       </td>
                     </tr>
                     
-                    {/* Group Items */}
-                    {inventoryItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group">
+                    {/* Group Items - Render only if not collapsed */}
+                    {!isCollapsed && inventoryItems.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group animate-in slide-in-from-top-1 duration-200">
                         <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{item.name}</td>
                         <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{item.category}</td>
                         <td className="px-4 py-3">

@@ -2,9 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#16a34a" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>The Green Spot</title>
     <link rel="icon" type="image/png" href="https://png.pngtree.com/png-vector/20220610/ourmid/pngtree-cannabis-hemp-oil-leaf-logo-png-image_4966601.png" />
+    <link rel="manifest" href="/manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -16,6 +20,8 @@
       body {
         font-family: 'Inter', sans-serif;
         background-color: #f3f4f6;
+        /* Prevent pull-to-refresh on mobile to feel like an app */
+        overscroll-behavior-y: none;
       }
       /* Custom scrollbar for receipt view */
       .receipt-scroll::-webkit-scrollbar {

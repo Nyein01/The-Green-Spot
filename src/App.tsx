@@ -60,6 +60,12 @@ const App: React.FC = () => {
   const [currentShop, setCurrentShop] = useState<ShopId>('greenspot');
   const [currentStaff, setCurrentStaff] = useState<string>('');
   
+  // Shift Tracking
+  const [shiftStartTime, setShiftStartTime] = useState<number | null>(() => {
+      const saved = localStorage.getItem('gs_shift_start');
+      return saved ? parseInt(saved) : null;
+  });
+  
   const [sales, setSales] = useState<SaleItem[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [reports, setReports] = useState<DayReport[]>([]);
@@ -232,12 +238,23 @@ const App: React.FC = () => {
     setIsSuperAdmin(isAdmin);
     setCurrentStaff(staffName);
     setIsAuthenticated(true);
+
+    // Record Shift Start if not already recorded (e.g. from page refresh)
+    if (!shiftStartTime) {
+        const start = Date.now();
+        setShiftStartTime(start);
+        localStorage.setItem('gs_shift_start', start.toString());
+    }
   }
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     setSales([]); setInventory([]); setReports([]); setExpenses([]);
     setCurrentShop('greenspot'); setIsSuperAdmin(false); setCurrentStaff('');
+    
+    // Clear shift data on logout
+    setShiftStartTime(null);
+    localStorage.removeItem('gs_shift_start');
   }
 
   if (!isAuthenticated) return <LoginForm onLogin={handleLogin} language={language} setLanguage={changeLanguage} />;

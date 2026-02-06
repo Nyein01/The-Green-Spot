@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => {
   
   return {
     plugins: [react()],
+    server: {
+      host: true, // This exposes the app to your local network (Wi-Fi)
+    },
     define: {
       // This ensures process.env.API_KEY in your code is replaced with the actual value during build
       'process.env.API_KEY': JSON.stringify(env.API_KEY)
