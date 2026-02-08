@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo } from 'react';
 import { InventoryItem, ProductType, FlowerGrade } from '../types';
-import { Plus, Edit2, Save, X, ClipboardList, Minus, ShoppingCart, ArrowLeft, FileSpreadsheet, FileText, Loader2, ChevronUp, ChevronDown, ChevronRight, ArrowUpDown, Leaf, Flame, Utensils, Zap, Package, Search, Trash2, CheckCircle2 } from 'lucide-react';
+import { Plus, Edit2, Save, X, ClipboardList, Minus, ShoppingCart, ArrowLeft, FileSpreadsheet, FileText, Loader2, ChevronUp, ChevronDown, ChevronRight, ArrowUpDown, Leaf, Flame, Utensils, Zap, Package, Search, Trash2, CheckCircle2, BellRing } from 'lucide-react';
 import { generateId } from '../utils/pricing';
 import { generateInventoryAnalysis } from '../services/geminiService';
 import { jsPDF } from "jspdf";
@@ -15,12 +16,13 @@ interface InventoryManagerProps {
   shopName: string;
   isSuperAdmin: boolean;
   language: Language;
+  onBroadcastLowStock: (items: InventoryItem[]) => void;
 }
 
 type SortField = 'name' | 'category' | 'grade' | 'stockLevel';
 type SortDirection = 'asc' | 'desc';
 
-export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, onUpdateInventory, onAdjustStock, onDeleteInventory, shopName, isSuperAdmin, language }) => {
+export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, onUpdateInventory, onAdjustStock, onDeleteInventory, shopName, isSuperAdmin, language, onBroadcastLowStock }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showOrderList, setShowOrderList] = useState(false);
@@ -420,6 +422,15 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ inventory, o
             </div>
 
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+                {outOfStockItems.length > 0 && showOrderList && (
+                    <button 
+                        onClick={() => onBroadcastLowStock(outOfStockItems)}
+                        className="flex items-center text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm animate-pulse"
+                    >
+                        <BellRing className="w-3 h-3 mr-1" /> Alert Staff
+                    </button>
+                )}
+                
                 <button 
                 onClick={handleExportPDF}
                 disabled={isExportingPDF}

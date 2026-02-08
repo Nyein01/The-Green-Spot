@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ProductType, FlowerGrade, InventoryItem, SaleItem } from '../types';
 import { calculateFlowerPrice, formatCurrency, generateId } from '../utils/pricing';
-import { ShoppingCart, Tag, AlertCircle, Search, X, ChevronDown, Check, Banknote, QrCode } from 'lucide-react';
+import { ShoppingCart, Tag, AlertCircle, Search, X, ChevronDown, Check, Banknote, QrCode, Percent, User, Ticket } from 'lucide-react';
 import { translations, Language } from '../utils/translations';
 
 interface SalesFormProps {
@@ -20,9 +21,15 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   const [grade, setGrade] = useState<FlowerGrade>(FlowerGrade.MID);
   const [quantity, setQuantity] = useState<number>(1);
   const [price, setPrice] = useState<number>(0);
+  const [basePrice, setBasePrice] = useState<number>(0); // Price before discount
   const [isAutoPrice, setIsAutoPrice] = useState<boolean>(true);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Scan'>('Cash');
   
+  // New Features State
+  const [customerName, setCustomerName] = useState<string>('');
+  const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'FIXED'>('NONE');
+  const [discountValue, setDiscountValue] = useState<number>(0);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
   const t = translations[language];
 
@@ -44,10 +51,9 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Auto-calculate price when dependencies change
+  // Auto-calculate BASE price when dependencies change
   useEffect(() => {
-    if (!isAutoPrice) return;
-
+    let calculated = 0;
     if (productType === ProductType.FLOWER) {
       const item = inventory.find(i => i.name === selectedStrain && i.category === ProductType.FLOWER);
       const effectiveGrade = item?.grade || grade;
@@ -55,32 +61,36 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
       if (item && item.grade && item.grade !== grade) {
         setGrade(item.grade);
       }
-      
-      const calcPrice = calculateFlowerPrice(effectiveGrade, quantity);
-      setPrice(calcPrice);
+      calculated = calculateFlowerPrice(effectiveGrade, quantity);
     } else {
         const item = inventory.find(i => i.name === selectedStrain && i.category === productType);
         if (item && item.price) {
-            setPrice(item.price * quantity);
-        } else {
-             setPrice(0); 
+            calculated = item.price * quantity;
         }
     }
-  }, [productType, selectedStrain, grade, quantity, isAutoPrice, inventory]);
+    setBasePrice(calculated);
+  }, [productType, selectedStrain, grade, quantity, inventory]);
+
+  // Apply Discount Logic to Final Price
+  useEffect(() => {
+    if (!isAutoPrice) return; // If manual override, ignore calc
+
+    let final = basePrice;
+    
+    if (discountType === 'PERCENT') {
+        const amountOff = basePrice * (discountValue / 100);
+        final = basePrice - amountOff;
+    } else if (discountType === 'FIXED') {
+        final = Math.max(0, basePrice - discountValue);
+    }
+
+    setPrice(final);
+  }, [basePrice, discountType, discountValue, isAutoPrice]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!selectedStrain) return alert("Please select a product.");
-
-    // Recalculate original price for data integrity
-    let originalPrice = 0;
-    if (productType === ProductType.FLOWER) {
-        originalPrice = calculateFlowerPrice(grade, quantity);
-    } else {
-        const item = inventory.find(i => i.name === selectedStrain && i.category === productType);
-        originalPrice = item && item.price ? item.price * quantity : Number(price);
-    }
 
     const sale: SaleItem = {
       id: generateId(),
@@ -91,10 +101,12 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
       grade: productType === ProductType.FLOWER ? grade : undefined,
       quantity,
       price: Number(price),
-      originalPrice,
+      originalPrice: basePrice, // Track what it should have been
       isNegotiated: !isAutoPrice,
       staffName: staffName,
-      paymentMethod: paymentMethod
+      paymentMethod: paymentMethod,
+      discount: basePrice - Number(price),
+      customerName: customerName || undefined
     };
 
     onSaleComplete(sale);
@@ -105,7 +117,10 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
     setSearchQuery('');
     setSelectedStrain('');
     setIsDropdownOpen(false);
-    setPaymentMethod('Cash'); // Reset to default
+    setPaymentMethod('Cash'); 
+    setDiscountType('NONE');
+    setDiscountValue(0);
+    setCustomerName('');
   };
 
   const handleTypeChange = (type: ProductType) => {
@@ -114,6 +129,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
       setSearchQuery('');
       setIsAutoPrice(true);
       setIsDropdownOpen(false);
+      setDiscountType('NONE');
   }
 
   const handleSelectItem = (item: InventoryItem) => {
@@ -235,6 +251,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                   onClick={() => {
                     setGrade(g);
                     setIsAutoPrice(true);
+                    setDiscountType('NONE');
                   }}
                   className={`px-2 py-2 text-xs font-semibold rounded-md border transition-all ${
                     grade === g
@@ -283,6 +300,69 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
           </div>
         </div>
 
+        {/* --- CUSTOMER & DISCOUNT SECTION --- */}
+        <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-left-2 duration-300 delay-100">
+           
+           {/* Customer Name */}
+           <div className="col-span-2 sm:col-span-1">
+             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Customer (Optional)</label>
+             <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                   <User className="h-4 w-4 text-gray-400" />
+                </div>
+                <input 
+                  type="text" 
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Guest / Member ID"
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
+             </div>
+           </div>
+
+           {/* Discount Toggles */}
+           <div className="col-span-2 sm:col-span-1">
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Discount</label>
+              <div className="flex space-x-2">
+                 <button
+                   type="button"
+                   onClick={() => { setDiscountType(discountType === 'PERCENT' ? 'NONE' : 'PERCENT'); setDiscountValue(10); setIsAutoPrice(true); }}
+                   className={`flex-1 flex items-center justify-center py-2 rounded-lg text-xs font-bold border transition-colors ${discountType === 'PERCENT' ? 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300'}`}
+                 >
+                    <Percent className="w-3 h-3 mr-1" /> %
+                 </button>
+                 <button
+                   type="button"
+                   onClick={() => { setDiscountType(discountType === 'FIXED' ? 'NONE' : 'FIXED'); setDiscountValue(50); setIsAutoPrice(true); }}
+                   className={`flex-1 flex items-center justify-center py-2 rounded-lg text-xs font-bold border transition-colors ${discountType === 'FIXED' ? 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300'}`}
+                 >
+                    <Ticket className="w-3 h-3 mr-1" /> ฿
+                 </button>
+              </div>
+           </div>
+
+           {/* Discount Value Input (Only shows if discount selected) */}
+           {discountType !== 'NONE' && (
+             <div className="col-span-2 animate-in slide-in-from-top-2">
+                 <div className="flex items-center space-x-2 bg-orange-50 dark:bg-orange-900/10 p-2 rounded-lg border border-orange-100 dark:border-orange-900/30">
+                     <span className="text-xs font-bold text-orange-600 uppercase w-16">
+                        {discountType === 'PERCENT' ? 'Percent Off:' : 'Amount Off:'}
+                     </span>
+                     <input 
+                       type="number"
+                       value={discountValue}
+                       onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
+                       className="flex-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm font-bold text-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                     />
+                     <span className="text-xs font-bold text-orange-600">
+                        {discountType === 'PERCENT' ? '%' : '฿'}
+                     </span>
+                 </div>
+             </div>
+           )}
+
+        </div>
+
         {/* Price & Negotiation */}
         <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-600 animate-in fade-in slide-in-from-left-2 duration-300 delay-100">
           <div className="flex justify-between items-center mb-2">
@@ -291,6 +371,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
               type="button"
               onClick={() => {
                   setIsAutoPrice(!isAutoPrice);
+                  setDiscountType('NONE');
               }}
               className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center p-1"
             >
@@ -312,7 +393,13 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
               }`}
             />
           </div>
-          {!isAutoPrice && (
+          {discountType !== 'NONE' && (
+            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1 flex items-center font-bold">
+              <Ticket className="w-3 h-3 mr-1" />
+              Discount Applied: -{formatCurrency(basePrice - price)}
+            </p>
+          )}
+          {!isAutoPrice && discountType === 'NONE' && (
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center animate-pulse">
               <AlertCircle className="w-3 h-3 mr-1" />
               {t.manualAdjustment}

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { SaleItem, InventoryItem, DayReport, Expense } from '../types';
 import { formatCurrency, generateId } from '../utils/pricing';
@@ -18,7 +19,8 @@ import {
   Plus,
   Banknote,
   QrCode,
-  UserCircle
+  UserCircle,
+  Ticket
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
@@ -172,6 +174,8 @@ export const DailyReport: React.FC<DailyReportProps> = ({
                 <td style="padding: 12px 16px; font-weight: 600; color: #111827;">
                     ${sale.productName}
                     ${sale.grade ? `<span style="display: inline-block; background-color: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 8px; font-weight: bold; color: #4b5563; text-transform: uppercase;">${sale.grade}</span>` : ''}
+                    ${sale.discount ? `<div style="font-size: 10px; color: #ea580c; font-weight: bold;">(Discount: -${formatCurrency(sale.discount)})</div>` : ''}
+                    ${sale.customerName ? `<div style="font-size: 10px; color: #4b5563;">Cust: ${sale.customerName}</div>` : ''}
                 </td>
                 <td style="padding: 12px 16px; color: #4b5563;">${sale.productType}</td>
                 <td style="padding: 12px 16px; text-align: center;">
@@ -381,13 +385,19 @@ export const DailyReport: React.FC<DailyReportProps> = ({
                             <Banknote className="w-3 h-3 ml-2 text-green-500" />
                         )}
                       </div>
-                      <div className="text-xs text-gray-500 flex items-center mt-0.5">
-                        <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px]">
-                          {sale.quantity}{sale.productType === 'Flower' ? 'g' : ' units'}
-                        </span>
-                        {sale.grade && <span className="mx-1 text-gray-400">•</span>}
-                        {sale.grade && <span className="text-gray-500">{sale.grade}</span>}
-                        {sale.staffName && <span className="ml-2 text-gray-400 text-[9px] border border-gray-200 px-1 rounded">By: {sale.staffName.split(' ')[0]}</span>}
+                      <div className="text-xs text-gray-500 flex flex-col mt-0.5">
+                        <div className="flex items-center">
+                            <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px]">
+                            {sale.quantity}{sale.productType === 'Flower' ? 'g' : ' units'}
+                            </span>
+                            {sale.grade && <span className="mx-1 text-gray-400">•</span>}
+                            {sale.grade && <span className="text-gray-500">{sale.grade}</span>}
+                            {sale.staffName && <span className="ml-2 text-gray-400 text-[9px] border border-gray-200 px-1 rounded">By: {sale.staffName.split(' ')[0]}</span>}
+                        </div>
+                        <div className="flex mt-1 space-x-2">
+                             {sale.customerName && <span className="text-[10px] text-blue-500 font-semibold">Cust: {sale.customerName}</span>}
+                             {sale.discount ? <span className="text-[10px] text-orange-500 font-bold">Disc: -{formatCurrency(sale.discount)}</span> : null}
+                        </div>
                       </div>
                     </div>
                   </div>

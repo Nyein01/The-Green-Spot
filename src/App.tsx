@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   PlusCircle, 
   Package, 
@@ -13,7 +13,6 @@ import {
   Wifi,
   WifiOff,
   LogOut,
-  TrendingUp,
   BarChart3,
   Archive,
   Loader2,
@@ -25,7 +24,11 @@ import {
   Droplets,
   Circle,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  Bell,
+  Send,
+  Lock,
+  Zap
 } from 'lucide-react';
 import { LoginForm } from './components/LoginForm';
 import { SalesForm } from './components/SalesForm';
@@ -33,11 +36,13 @@ import { InventoryManager } from './components/InventoryManager';
 import { DailyReport } from './components/DailyReport';
 import { HistoricalReport } from './components/HistoricalReport';
 import { ArchiveView } from './components/ArchiveView';
+import { ToastContainer, ToastMessage } from './components/Toast';
 import { 
   subscribeToSales, 
   subscribeToInventory,
   subscribeToReports,
   subscribeToExpenses,
+  subscribeToAppNotifications,
   addSaleToCloud,
   addExpenseToCloud,
   deleteExpenseFromCloud,
@@ -50,16 +55,22 @@ import {
   migrateLocalToCloud,
   seedDefaultInventory,
   restoreSalesBatch,
-  deleteReportFromCloud
+  deleteReportFromCloud,
+  sendAppNotification
 } from './services/storageService';
 import { SaleItem, InventoryItem, DayReport, Tab, Expense } from './types';
 import { generateId } from './utils/pricing';
 import { translations, Language } from './utils/translations';
+import { playClickSound, triggerHaptic } from './utils/feedback';
 
 type ShopId = 'greenspot' | 'nearcannabis';
 type Theme = 'daylight' | 'midnight' | 'sunset' | 'ocean' | 'minimal' | 'glass';
 
 const App: React.FC = () => {
+  // --- MAINTENANCE MODE STATE ---
+  const [isSiteClosed, setIsSiteClosed] = useState(true); 
+  // -----------------------------
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   
@@ -84,6 +95,13 @@ const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   
+  // Notifications
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const prevInventoryRef = useRef<Record<string, number>>({});
+  const isFirstLoadRef = useRef(true);
+  const loginTimeRef = useRef(Date.now());
+  const [customAlertMsg, setCustomAlertMsg] = useState('');
+
   // Language State
   const [language, setLanguage] = useState<Language>('en');
 
@@ -93,6 +111,20 @@ const App: React.FC = () => {
   };
 
   const t = translations[language];
+
+  // Helper to add toast
+  const addToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+      const id = Math.random().toString(36).substring(2, 9);
+      setToasts(prev => [...prev, { id, message, type }]);
+      if (type === 'warning' || type === 'error') {
+          playClickSound(); // Re-use click sound or add a specific alert sound if available
+          triggerHaptic();
+      }
+  };
+
+  const removeToast = (id: string) => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+  };
 
   useEffect(() => {
     // Check local storage for theme & language
@@ -126,6 +158,26 @@ const App: React.FC = () => {
     localStorage.setItem('greentrack_theme', theme);
   }, [theme]);
 
+  // Global Click Listener for Sound & Haptics
+  useEffect(() => {
+    const handleGlobalClick = (e: any) => {
+      const target = e.target as HTMLElement;
+      // Traverse up to find if a clickable element was clicked (button, link, input, select, or button role)
+      const interactive = target.closest('button, a, input, select, [role="button"]');
+      
+      if (interactive) {
+        // Skip for disabled elements
+        if ((interactive as any).disabled) return;
+        
+        playClickSound();
+        triggerHaptic();
+      }
+    };
+
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) return;
     setLoading(true);
@@ -136,11 +188,43 @@ const App: React.FC = () => {
     window.addEventListener('offline', handleOffline);
 
     const unsubscribeSales = subscribeToSales(currentShop, (data) => setSales(data));
-    const unsubscribeInventory = subscribeToInventory(currentShop, (data) => setInventory(data));
     const unsubscribeExpenses = subscribeToExpenses(currentShop, (data) => setExpenses(data));
     const unsubscribeReports = subscribeToReports(currentShop, (data) => {
         setReports(data);
         setLoading(false);
+    });
+
+    // Special handling for inventory to detect changes for notifications
+    const unsubscribeInventory = subscribeToInventory(currentShop, (data) => {
+        setInventory(data);
+
+        // Check for local low stock alerts (Client side check)
+        if (!isFirstLoadRef.current) {
+            data.forEach(item => {
+                const prevStock = prevInventoryRef.current[item.id];
+                // Trigger if stock drops to or below 10, AND it wasn't already below 10 (or if it's a new item dropping)
+                if (item.stockLevel <= 10 && item.stockLevel > 0 && (prevStock === undefined || prevStock > 10)) {
+                    addToast(`⚠️ Low Stock: ${item.name} (${item.stockLevel} left)`, 'warning');
+                }
+                // Trigger critical alert for out of stock
+                if (item.stockLevel <= 0 && (prevStock === undefined || prevStock > 0)) {
+                    addToast(`🚨 OUT OF STOCK: ${item.name}`, 'error');
+                }
+            });
+        }
+
+        // Update refs
+        const newStockMap: Record<string, number> = {};
+        data.forEach(i => newStockMap[i.id] = i.stockLevel);
+        prevInventoryRef.current = newStockMap;
+        isFirstLoadRef.current = false;
+    });
+
+    // Sub to Broadcast Notifications (from other devices)
+    const unsubscribeNotifications = subscribeToAppNotifications(currentShop, loginTimeRef.current, (note) => {
+        // Only show if it's not sent by me (optional, but sometimes nice to see confirmation)
+        // For now show all to confirm system works
+        addToast(note.message, note.type);
     });
 
     return () => {
@@ -148,6 +232,7 @@ const App: React.FC = () => {
       unsubscribeInventory();
       unsubscribeReports();
       unsubscribeExpenses();
+      unsubscribeNotifications();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -161,9 +246,15 @@ const App: React.FC = () => {
   const handleNewSale = async (sale: SaleItem) => {
     if (!isOnline) return alert("⚠️ You are offline.");
     const success = await addSaleToCloud(currentShop, sale);
-    if (!success) return alert("⚠️ Error saving sale.");
+    if (!success) {
+        addToast("Error saving sale", 'error');
+        return;
+    }
+    
     const item = inventory.find(i => i.name === sale.productName);
     if (item) await adjustStockInCloud(currentShop, item.id, item.stockLevel, -sale.quantity);
+    
+    addToast("Sale recorded successfully", 'success');
   };
 
   const handleAddExpense = async (description: string, amount: number) => {
@@ -175,17 +266,18 @@ const App: React.FC = () => {
         timestamp: Date.now()
     };
     await addExpenseToCloud(currentShop, expense);
+    addToast("Expense added", 'info');
   };
 
   const handleDeleteExpense = async (id: string) => {
     if (!isOnline) return alert("Offline: Cannot delete expense.");
     await deleteExpenseFromCloud(currentShop, id);
+    addToast("Expense deleted", 'info');
   };
 
   const handleDeleteSale = async (sale: SaleItem) => {
     if (!isOnline) return alert("⚠️ You are offline. Cannot delete sales.");
     
-    // Immediate feedback
     setDeletingIds(prev => new Set(prev).add(sale.id));
     
     try {
@@ -193,12 +285,13 @@ const App: React.FC = () => {
         if (success) {
             const item = inventory.find(i => i.name === sale.productName);
             if (item) await adjustStockInCloud(currentShop, item.id, item.stockLevel, sale.quantity);
+            addToast("Sale deleted & stock restored", 'success');
         } else {
-            alert("Failed to delete sale from cloud.");
+            addToast("Failed to delete sale", 'error');
         }
     } catch (error) {
         console.error(error);
-        alert("Error deleting sale.");
+        addToast("Error deleting sale", 'error');
     } finally {
         setDeletingIds(prev => { const n = new Set(prev); n.delete(sale.id); return n; });
     }
@@ -207,11 +300,13 @@ const App: React.FC = () => {
   const handleDeleteInventory = async (id: string) => {
     if (!isOnline) return alert("Cannot delete items while offline.");
     await deleteInventoryItemFromCloud(currentShop, id);
+    addToast("Product deleted", 'info');
   }
 
   const handleResetDay = async () => {
     await clearSalesInCloud(currentShop, sales);
     await clearExpensesInCloud(currentShop, expenses);
+    addToast("Register cleared for new shift", 'success');
   };
 
   const handleRestoreReport = async (report: DayReport) => {
@@ -219,10 +314,10 @@ const App: React.FC = () => {
       if (confirm(`Restore ${report.sales.length} sales from ${new Date(report.date).toLocaleDateString()} to the live register?`)) {
           const success = await restoreSalesBatch(currentShop, report.sales);
           if (success) {
-              alert("Sales restored successfully!");
+              addToast("Sales restored successfully", 'success');
               setActiveTab(Tab.SALES);
           } else {
-              alert("Failed to restore sales.");
+              addToast("Failed to restore sales", 'error');
           }
       }
   };
@@ -234,7 +329,9 @@ const App: React.FC = () => {
       }
       const success = await deleteReportFromCloud(currentShop, reportId);
       if (!success) {
-          alert("Error: Could not delete report from cloud database.");
+          addToast("Error deleting report", 'error');
+      } else {
+          addToast("Report deleted from archive", 'success');
       }
   }
 
@@ -247,7 +344,36 @@ const App: React.FC = () => {
 
   const handleSeed = async () => {
     await seedDefaultInventory(currentShop);
-    alert("Default inventory added!");
+    addToast("Default inventory loaded", 'success');
+  }
+
+  const handleSendBroadcast = async () => {
+    if (!customAlertMsg) return;
+    const success = await sendAppNotification(currentShop, {
+        id: generateId(),
+        message: customAlertMsg,
+        type: 'info',
+        timestamp: Date.now(),
+        sentBy: currentStaff
+    });
+    if (success) {
+        setCustomAlertMsg('');
+        // Toast will trigger from subscription listener
+    } else {
+        addToast("Failed to send broadcast", 'error');
+    }
+  }
+  
+  const handleBroadcastLowStock = async (outOfStockItems: InventoryItem[]) => {
+      if (outOfStockItems.length === 0) return;
+      const message = `🚨 CRITICAL ALERT: ${outOfStockItems.length} items are OUT OF STOCK! Please restock immediately.`;
+      await sendAppNotification(currentShop, {
+          id: generateId(),
+          message: message,
+          type: 'error',
+          timestamp: Date.now(),
+          sentBy: currentStaff
+      });
   }
 
   const handleLogin = (shopId: 'greenspot' | 'nearcannabis', isAdmin: boolean, staffName: string) => {
@@ -255,6 +381,11 @@ const App: React.FC = () => {
     setIsSuperAdmin(isAdmin);
     setCurrentStaff(staffName);
     setIsAuthenticated(true);
+    
+    // Reset notification state
+    isFirstLoadRef.current = true;
+    prevInventoryRef.current = {};
+    loginTimeRef.current = Date.now();
 
     // Record Shift Start if not already recorded (e.g. from page refresh)
     if (!shiftStartTime) {
@@ -262,6 +393,8 @@ const App: React.FC = () => {
         setShiftStartTime(start);
         localStorage.setItem('gs_shift_start', start.toString());
     }
+    
+    addToast(`Welcome back, ${staffName.split(' ')[0]}`, 'success');
   }
 
   const handleLogout = () => {
@@ -272,6 +405,45 @@ const App: React.FC = () => {
     // Clear shift data on logout
     setShiftStartTime(null);
     localStorage.removeItem('gs_shift_start');
+  }
+
+  // --- MEME / CLOSED MODE RENDER ---
+  if (isSiteClosed) {
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[9999] p-4 text-center font-mono">
+        <div className="animate-pulse mb-8">
+           <Leaf className="w-24 h-24 text-green-500" />
+        </div>
+        
+        <h1 className="text-6xl md:text-8xl font-black text-white mb-4 tracking-tighter">
+          420 <span className="text-green-500">ERROR</span>
+        </h1>
+        
+        <div className="bg-white/10 backdrop-blur-sm p-6 rounded-2xl border border-white/10 max-w-md w-full shadow-2xl transform hover:scale-105 transition-transform duration-500">
+            <img 
+              src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHQwaHZ1Z2Z5ZnJ5ZnJ5ZnJ5ZnJ5ZnJ5ZnJ5ZnJ5ZnJ5ZnJ5/3o6ozvv0ZsJCNRThAY/giphy.gif" 
+              alt="Closed Meme" 
+              className="w-full rounded-xl mb-6 shadow-inner border border-white/5 object-cover"
+            />
+            <h2 className="text-2xl font-bold text-white uppercase tracking-widest mb-2">
+              SITE IS CLOSED
+            </h2>
+            <p className="text-green-400 font-bold uppercase text-sm">
+              We are touching grass. Be back soon.
+            </p>
+        </div>
+
+        <button 
+          onClick={() => {
+             const pass = prompt("Admin Override:");
+             if (pass === '0000') setIsSiteClosed(false);
+          }}
+          className="mt-12 text-white/10 hover:text-white/30 text-xs uppercase tracking-[0.3em] transition-colors"
+        >
+          System Override
+        </button>
+      </div>
+    );
   }
 
   if (!isAuthenticated) return <LoginForm onLogin={handleLogin} language={language} setLanguage={changeLanguage} />;
@@ -318,13 +490,11 @@ const App: React.FC = () => {
           </div>
         );
       case Tab.INVENTORY:
-        return <div className={contentClass}><InventoryManager inventory={inventory} onUpdateInventory={(item) => updateInventoryInCloud(currentShop, item)} onAdjustStock={(id, adj) => { const item = inventory.find(i => i.id === id); if(item) adjustStockInCloud(currentShop, id, item.stockLevel, adj); }} onDeleteInventory={handleDeleteInventory} shopName={shopNames[currentShop]} isSuperAdmin={isSuperAdmin} language={language} /></div>;
+        return <div className={contentClass}><InventoryManager inventory={inventory} onUpdateInventory={(item) => updateInventoryInCloud(currentShop, item)} onAdjustStock={(id, adj) => { const item = inventory.find(i => i.id === id); if(item) adjustStockInCloud(currentShop, id, item.stockLevel, adj); }} onDeleteInventory={handleDeleteInventory} shopName={shopNames[currentShop]} isSuperAdmin={isSuperAdmin} language={language} onBroadcastLowStock={handleBroadcastLowStock} /></div>;
       case Tab.REPORT:
         return <div className={contentClass}><DailyReport sales={sales} expenses={expenses} inventory={inventory} onDeleteSale={handleDeleteSale} onAddExpense={handleAddExpense} onDeleteExpense={handleDeleteExpense} onReset={handleResetDay} deletingIds={deletingIds} shopName={shopNames[currentShop]} staffName={currentStaff} /></div>;
       case Tab.ARCHIVE:
         return <div className={contentClass}><ArchiveView reports={reports} onRestore={handleRestoreReport} onDelete={handleDeleteReport} /></div>;
-      case Tab.WEEKLY:
-        return <div className={contentClass}><HistoricalReport archivedReports={reports} inventory={inventory} timeframe="weekly" shopName={shopNames[currentShop]} /></div>;
       case Tab.MONTHLY:
         return <div className={contentClass}><HistoricalReport archivedReports={reports} inventory={inventory} timeframe="monthly" shopName={shopNames[currentShop]} /></div>;
       case Tab.SETTINGS:
@@ -335,6 +505,30 @@ const App: React.FC = () => {
             
             <div className="space-y-8">
               
+              {/* Notification System */}
+              <div className="bg-white/50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
+                  <div className="flex items-center text-gray-800 dark:text-white mb-6 font-bold text-lg">
+                    <Bell className="w-6 h-6 mr-2 text-indigo-600" />
+                    Broadcast System
+                  </div>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={customAlertMsg}
+                      onChange={(e) => setCustomAlertMsg(e.target.value)}
+                      placeholder="Type a message to send to all staff..."
+                      className="flex-1 p-3 rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                    <button 
+                      onClick={handleSendBroadcast}
+                      disabled={!customAlertMsg}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 rounded-xl font-bold flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Send className="w-4 h-4 mr-2" /> Send Alert
+                    </button>
+                  </div>
+              </div>
+
               {/* Theme Switcher Grid */}
               <div className="bg-white/50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
                   <div className="flex items-center text-gray-800 dark:text-white mb-6 font-bold text-lg">
@@ -453,6 +647,7 @@ const App: React.FC = () => {
 
   return (
     <div className={`${theme === 'midnight' ? 'dark' : ''}`}>
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <style>{`
         @keyframes slideInUp {
           from { opacity: 0; transform: translateY(15px); }
@@ -504,8 +699,7 @@ const App: React.FC = () => {
               ))}
               <div className="pt-4 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{t.dashboard}</div>
               {[
-                { t: Tab.WEEKLY, l: 'Weekly', i: <TrendingUp className="w-5 h-5 mr-3" /> },
-                { t: Tab.MONTHLY, l: 'Monthly', i: <BarChart3 className="w-5 h-5 mr-3" /> },
+                { t: Tab.MONTHLY, l: 'Dashboard', i: <BarChart3 className="w-5 h-5 mr-3" /> },
                 { t: Tab.SETTINGS, l: t.settings, i: <Cloud className="w-5 h-5 mr-3" /> },
               ].map(item => (
                 <button key={item.t} onClick={() => { setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-indigo-600 text-white font-bold scale-105' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{item.i}{item.l}</button>

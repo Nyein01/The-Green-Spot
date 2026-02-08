@@ -1,3 +1,4 @@
+
 export enum ProductType {
   FLOWER = 'Flower',
   PRE_ROLL = 'Pre-roll',
@@ -27,6 +28,8 @@ export interface SaleItem {
   notes?: string;
   staffName?: string; // Added to track who made the sale
   paymentMethod?: 'Cash' | 'Scan';
+  discount?: number; // Amount discounted
+  customerName?: string; // Optional CRM tracking
 }
 
 export interface InventoryItem {
@@ -60,12 +63,19 @@ export interface DayReport {
   shiftEndTime?: number;
 }
 
+export interface AppNotification {
+  id: string;
+  message: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  timestamp: number;
+  sentBy?: string;
+}
+
 export enum Tab {
   SALES = 'Sales',
   INVENTORY = 'Inventory',
   REPORT = 'Daily Report',
   ARCHIVE = 'Sales Archive',
-  WEEKLY = 'Weekly Highlights',
   MONTHLY = 'Monthly Summary',
   SETTINGS = 'Settings'
 }
