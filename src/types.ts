@@ -74,8 +74,8 @@ export interface AppNotification {
 export enum Tab {
   SALES = 'Sales',
   INVENTORY = 'Inventory',
+  CUSTOMERS = 'Customers',
   REPORT = 'Daily Report',
   ARCHIVE = 'Sales Archive',
-  MONTHLY = 'Monthly Summary',
   SETTINGS = 'Settings'
 }

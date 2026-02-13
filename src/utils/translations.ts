@@ -1,3 +1,4 @@
+
 export type Language = 'en' | 'th' | 'mm';
 
 export const translations = {
@@ -5,6 +6,7 @@ export const translations = {
     // Sidebar
     sales: "Sales",
     inventory: "Inventory",
+    customers: "Customers",
     report: "Report",
     archive: "Archive",
     settings: "Settings",
@@ -61,6 +63,7 @@ export const translations = {
   th: {
     sales: "การขาย",
     inventory: "คลังสินค้า",
+    customers: "ลูกค้า",
     report: "รายงาน",
     archive: "ประวัติ",
     settings: "ตั้งค่า",
@@ -112,6 +115,7 @@ export const translations = {
   mm: {
     sales: "အရောင်း",
     inventory: "ကုန်ပစ္စည်း",
+    customers: "ဖောက်သည်များ",
     report: "မှတ်တမ်း",
     archive: "သိမ်းဆည်း",
     settings: "ဆက်တင်များ",
