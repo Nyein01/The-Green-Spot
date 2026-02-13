@@ -68,7 +68,7 @@ type Theme = 'daylight' | 'midnight' | 'sunset' | 'ocean' | 'minimal' | 'glass';
 
 const App: React.FC = () => {
   // --- MAINTENANCE MODE STATE ---
-  const [isSiteClosed, setIsSiteClosed] = useState(true); 
+  const [isSiteClosed, setIsSiteClosed] = useState(false); 
   // -----------------------------
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
