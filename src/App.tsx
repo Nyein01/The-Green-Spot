@@ -100,8 +100,6 @@ const App: React.FC = () => {
   
   // Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const prevInventoryRef = useRef<Record<string, number>>({});
-  const isFirstLoadRef = useRef(true);
   const loginTimeRef = useRef(Date.now());
   const [customAlertMsg, setCustomAlertMsg] = useState('');
 
@@ -201,27 +199,6 @@ const App: React.FC = () => {
     // Special handling for inventory to detect changes for notifications
     const unsubscribeInventory = subscribeToInventory(currentShop, (data) => {
         setInventory(data);
-
-        // Check for local low stock alerts (Client side check)
-        if (!isFirstLoadRef.current) {
-            data.forEach(item => {
-                const prevStock = prevInventoryRef.current[item.id];
-                // Trigger if stock drops to or below 10, AND it wasn't already below 10 (or if it's a new item dropping)
-                if (item.stockLevel <= 10 && item.stockLevel > 0 && (prevStock === undefined || prevStock > 10)) {
-                    addToast(`⚠️ Low Stock: ${item.name} (${item.stockLevel} left)`, 'warning');
-                }
-                // Trigger critical alert for out of stock
-                if (item.stockLevel <= 0 && (prevStock === undefined || prevStock > 0)) {
-                    addToast(`🚨 OUT OF STOCK: ${item.name}`, 'error');
-                }
-            });
-        }
-
-        // Update refs
-        const newStockMap: Record<string, number> = {};
-        data.forEach(i => newStockMap[i.id] = i.stockLevel);
-        prevInventoryRef.current = newStockMap;
-        isFirstLoadRef.current = false;
     });
 
     // Sub to Broadcast Notifications (from other devices)
@@ -398,8 +375,6 @@ const App: React.FC = () => {
     setIsAuthenticated(true);
     
     // Reset notification state
-    isFirstLoadRef.current = true;
-    prevInventoryRef.current = {};
     loginTimeRef.current = Date.now();
 
     // Record Shift Start if not already recorded (e.g. from page refresh)
