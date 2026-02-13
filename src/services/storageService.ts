@@ -7,7 +7,7 @@ import {
   doc, 
   setDoc, 
   updateDoc, 
-  deleteDoc,
+  deleteDoc, 
   onSnapshot, 
   query, 
   orderBy,
@@ -26,6 +26,15 @@ const getCollections = (shopId: string) => {
       reports: 'reports_nc',
       expenses: 'expenses_nc',
       notifications: 'notifications_nc'
+    };
+  }
+  if (shopId === 'smallshop') {
+    return {
+      sales: 'sales_ss',
+      inventory: 'inventory_ss',
+      reports: 'reports_ss',
+      expenses: 'expenses_ss',
+      notifications: 'notifications_ss'
     };
   }
   // Default to original collections for The Green Spot

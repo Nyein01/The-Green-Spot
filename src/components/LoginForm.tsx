@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Leaf, Lock, User, ArrowRight, ScanLine, ShieldCheck, Store, MapPin, CheckCircle2 } from 'lucide-react';
+import { Leaf, Lock, User, ArrowRight, ScanLine, ShieldCheck, Store, MapPin, CheckCircle2, ShoppingBag } from 'lucide-react';
 import { translations, Language } from '../utils/translations';
 
 interface LoginFormProps {
-  onLogin: (shopId: 'greenspot' | 'nearcannabis', isSuperAdmin: boolean, staffName: string) => void;
+  onLogin: (shopId: 'greenspot' | 'nearcannabis' | 'smallshop', isSuperAdmin: boolean, staffName: string) => void;
   language: Language;
   setLanguage: (lang: Language) => void;
 }
@@ -40,6 +40,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
         } else if (user === 'nearcannabis' || user === 'nearcanabis') {
             onLogin('nearcannabis', false, 'Staff (Near Cannabis)');
             success = true;
+        } else if (user === 'smallshop') {
+            onLogin('smallshop', false, 'Staff (Small Shop)');
+            success = true;
         }
     }
 
@@ -62,7 +65,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
     }
   };
 
-  const handleAdminSelectShop = (shopId: 'greenspot' | 'nearcannabis') => {
+  const handleAdminSelectShop = (shopId: 'greenspot' | 'nearcannabis' | 'smallshop') => {
       onLogin(shopId, true, 'Super Admin');
   };
 
@@ -72,7 +75,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-slate-950 text-white">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black"></div>
             
-            <div className="relative z-10 w-full max-w-2xl animate-fade-in">
+            <div className="relative z-10 w-full max-w-4xl animate-fade-in">
                 <div className="text-center mb-10">
                     <div className="inline-flex items-center justify-center p-3 bg-white/10 rounded-full mb-4 ring-1 ring-white/20">
                         <ShieldCheck className="w-8 h-8 text-green-400" />
@@ -81,7 +84,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
                     <p className="text-slate-400">Please select the location you wish to manage for this session.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* The Green Spot Card */}
                     <button 
                         onClick={() => handleAdminSelectShop('greenspot')}
@@ -110,6 +113,21 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
                         </div>
                         <h3 className="text-xl font-bold text-white mb-1">Near Cannabis</h3>
                         <p className="text-sm text-slate-500 group-hover:text-slate-400">Partner Location</p>
+                    </button>
+
+                    {/* Small Shop Card */}
+                    <button 
+                        onClick={() => handleAdminSelectShop('smallshop')}
+                        className="group relative bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 hover:border-amber-500 rounded-2xl p-6 text-left transition-all duration-300 hover:shadow-2xl hover:shadow-amber-900/20 hover:-translate-y-1"
+                    >
+                         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <CheckCircle2 className="w-6 h-6 text-amber-500" />
+                        </div>
+                        <div className="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-amber-500 group-hover:text-white transition-colors text-amber-500">
+                            <ShoppingBag className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-1">Small Shop</h3>
+                        <p className="text-sm text-slate-500 group-hover:text-slate-400">Boutique Store</p>
                     </button>
                 </div>
 

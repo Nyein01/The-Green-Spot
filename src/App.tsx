@@ -66,7 +66,7 @@ import { generateId, formatCurrency } from './utils/pricing';
 import { translations, Language } from './utils/translations';
 import { playClickSound, triggerHaptic } from './utils/feedback';
 
-type ShopId = 'greenspot' | 'nearcannabis';
+type ShopId = 'greenspot' | 'nearcannabis' | 'smallshop';
 type Theme = 'daylight' | 'midnight' | 'sunset' | 'ocean' | 'minimal' | 'glass';
 
 const App: React.FC = () => {
@@ -110,7 +110,8 @@ const App: React.FC = () => {
 
   const shopNames = {
     greenspot: "The Green Spot",
-    nearcannabis: "Near Cannabis"
+    nearcannabis: "Near Cannabis",
+    smallshop: "Small Shop"
   };
 
   const t = translations[language];
@@ -390,7 +391,7 @@ const App: React.FC = () => {
       });
   }
 
-  const handleLogin = (shopId: 'greenspot' | 'nearcannabis', isAdmin: boolean, staffName: string) => {
+  const handleLogin = (shopId: 'greenspot' | 'nearcannabis' | 'smallshop', isAdmin: boolean, staffName: string) => {
     setCurrentShop(shopId);
     setIsSuperAdmin(isAdmin);
     setCurrentStaff(staffName);
@@ -770,14 +771,17 @@ const App: React.FC = () => {
                      className={`w-full p-4 rounded-xl text-sm font-bold appearance-none outline-none border-2 transition-all cursor-pointer ${
                        currentShop === 'greenspot' 
                          ? 'bg-green-900/20 border-green-500 text-green-400' 
-                         : 'bg-blue-900/20 border-blue-500 text-blue-400'
+                         : currentShop === 'nearcannabis'
+                         ? 'bg-blue-900/20 border-blue-500 text-blue-400'
+                         : 'bg-amber-900/20 border-amber-500 text-amber-400'
                      }`}
                    >
                      <option value="greenspot">The Green Spot</option>
                      <option value="nearcannabis">Near Cannabis</option>
+                     <option value="smallshop">Small Shop</option>
                    </select>
                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                     <ArrowUpDown className={`w-4 h-4 ${currentShop === 'greenspot' ? 'text-green-500' : 'text-blue-500'}`} />
+                     <ArrowUpDown className={`w-4 h-4 ${currentShop === 'greenspot' ? 'text-green-500' : currentShop === 'nearcannabis' ? 'text-blue-500' : 'text-amber-500'}`} />
                    </div>
                  </div>
               </div>
