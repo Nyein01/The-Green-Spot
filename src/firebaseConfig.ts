@@ -1,8 +1,9 @@
+
 // @ts-ignore
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 // @ts-ignore
-import { getAuth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBNbaGjHax-W4T8nvQ22J1PhL8ttu9xGpQ",
@@ -21,3 +22,4 @@ const app = initializeApp(firebaseConfig);
 // Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
