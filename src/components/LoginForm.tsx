@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Leaf, Lock, User, ArrowRight, Fingerprint, ScanLine, Globe, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Leaf, Lock, User, ArrowRight, ScanLine, ShieldCheck, Store, MapPin, CheckCircle2 } from 'lucide-react';
 import { translations, Language } from '../utils/translations';
 
 interface LoginFormProps {
@@ -13,6 +13,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showShopSelection, setShowShopSelection] = useState(false);
 
   const t = translations[language];
 
@@ -48,8 +49,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
             onLogin('greenspot', false, 'Manager');
             success = true;
         } else if (user === 'admin') {
-            onLogin('greenspot', true, 'Super Admin'); 
-            success = true;
+            // Intercept Admin Login to force Shop Selection
+            setShowShopSelection(true);
+            setLoading(false);
+            return;
         }
     }
 
@@ -59,6 +62,68 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
     }
   };
 
+  const handleAdminSelectShop = (shopId: 'greenspot' | 'nearcannabis') => {
+      onLogin(shopId, true, 'Super Admin');
+  };
+
+  // --- ADMIN SHOP SELECTION SCREEN ---
+  if (showShopSelection) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-slate-950 text-white">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black"></div>
+            
+            <div className="relative z-10 w-full max-w-2xl animate-fade-in">
+                <div className="text-center mb-10">
+                    <div className="inline-flex items-center justify-center p-3 bg-white/10 rounded-full mb-4 ring-1 ring-white/20">
+                        <ShieldCheck className="w-8 h-8 text-green-400" />
+                    </div>
+                    <h2 className="text-3xl font-black tracking-tight mb-2">Admin Access Granted</h2>
+                    <p className="text-slate-400">Please select the location you wish to manage for this session.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* The Green Spot Card */}
+                    <button 
+                        onClick={() => handleAdminSelectShop('greenspot')}
+                        className="group relative bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 hover:border-green-500 rounded-2xl p-6 text-left transition-all duration-300 hover:shadow-2xl hover:shadow-green-900/20 hover:-translate-y-1"
+                    >
+                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <CheckCircle2 className="w-6 h-6 text-green-500" />
+                        </div>
+                        <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-500 group-hover:text-white transition-colors text-green-500">
+                            <Leaf className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-1">The Green Spot</h3>
+                        <p className="text-sm text-slate-500 group-hover:text-slate-400">Main Dispensary</p>
+                    </button>
+
+                    {/* Near Cannabis Card */}
+                    <button 
+                        onClick={() => handleAdminSelectShop('nearcannabis')}
+                        className="group relative bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 hover:border-blue-500 rounded-2xl p-6 text-left transition-all duration-300 hover:shadow-2xl hover:shadow-blue-900/20 hover:-translate-y-1"
+                    >
+                         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <CheckCircle2 className="w-6 h-6 text-blue-500" />
+                        </div>
+                        <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-500 group-hover:text-white transition-colors text-blue-500">
+                            <Store className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-1">Near Cannabis</h3>
+                        <p className="text-sm text-slate-500 group-hover:text-slate-400">Partner Location</p>
+                    </button>
+                </div>
+
+                <div className="mt-12 text-center">
+                    <button onClick={() => setShowShopSelection(false)} className="text-slate-500 hover:text-white text-sm">
+                        Cancel and return to login
+                    </button>
+                </div>
+            </div>
+        </div>
+      );
+  }
+
+  // --- LOGIN SCREEN ---
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
       {/* Animated Background Mesh */}

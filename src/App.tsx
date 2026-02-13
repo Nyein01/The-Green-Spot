@@ -30,7 +30,8 @@ import {
   Send,
   Palette,
   CheckCircle2,
-  Users
+  Users,
+  ArrowUpDown
 } from 'lucide-react';
 import { LoginForm } from './components/LoginForm';
 import { SalesForm } from './components/SalesForm';
@@ -761,7 +762,28 @@ const App: React.FC = () => {
                  </div>
               </div>
             </div>
-            {isSuperAdmin && <div className="px-4 mb-4"><select value={currentShop} onChange={(e) => setCurrentShop(e.target.value as ShopId)} className="w-full p-2.5 rounded-lg text-sm bg-slate-800 border border-slate-600 text-white"><option value="greenspot">The Green Spot</option><option value="nearcannabis">Near Cannabis</option></select></div>}
+            {isSuperAdmin && (
+              <div className="px-4 mb-6">
+                 <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">Current Shop Context</div>
+                 <div className="relative">
+                   <select 
+                     value={currentShop} 
+                     onChange={(e) => setCurrentShop(e.target.value as ShopId)} 
+                     className={`w-full p-4 rounded-xl text-sm font-bold appearance-none outline-none border-2 transition-all cursor-pointer ${
+                       currentShop === 'greenspot' 
+                         ? 'bg-green-900/20 border-green-500 text-green-400' 
+                         : 'bg-blue-900/20 border-blue-500 text-blue-400'
+                     }`}
+                   >
+                     <option value="greenspot">The Green Spot</option>
+                     <option value="nearcannabis">Near Cannabis</option>
+                   </select>
+                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                     <ArrowUpDown className={`w-4 h-4 ${currentShop === 'greenspot' ? 'text-green-500' : 'text-blue-500'}`} />
+                   </div>
+                 </div>
+              </div>
+            )}
             
             <div className="px-4 space-y-1 mt-4">
               {[
