@@ -3,7 +3,7 @@ import { SaleItem, InventoryItem, DayReport, Expense } from '../types';
 import { formatCurrency, generateId } from '../utils/pricing';
 import { saveDayReportToCloud } from '../services/storageService';
 import { generateSalesAnalysis } from '../services/geminiService';
-import { Download, TrendingUp, Save, LogOut, Wallet, Plus, Trash2, QrCode, Wand2, AlertTriangle, RefreshCw, Loader2, Leaf, Calendar } from 'lucide-react';
+import { Download, TrendingUp, Save, LogOut, Wallet, Plus, Trash2, QrCode, Wand2, AlertTriangle, RefreshCw, Loader2, Leaf, Calendar, X } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -27,6 +27,9 @@ export const DailyReport: React.FC<DailyReportProps> = ({
   const [expDesc, setExpDesc] = useState('');
   const [expAmount, setExpAmount] = useState('');
   
+  // Delete Modal State
+  const [saleToDelete, setSaleToDelete] = useState<SaleItem | null>(null);
+
   // AI State
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
@@ -130,8 +133,24 @@ export const DailyReport: React.FC<DailyReportProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in max-w-6xl mx-auto pb-20">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in max-w-6xl mx-auto pb-20 relative">
       
+      {/* Custom Confirmation Modal */}
+      {saleToDelete && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSaleToDelete(null)}>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-100 dark:border-gray-700 relative animate-fade-in" onClick={e => e.stopPropagation()}>
+                <button onClick={() => setSaleToDelete(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X className="w-5 h-5" /></button>
+                <div className="flex justify-center mb-4"><div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-full"><AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" /></div></div>
+                <h3 className="text-xl font-bold text-center mb-2 text-gray-900 dark:text-white">Void Transaction?</h3>
+                <p className="text-center text-gray-500 dark:text-gray-400 text-sm mb-6">Are you sure you want to delete <b>{saleToDelete.productName}</b>? Stock will be restored.</p>
+                <div className="grid grid-cols-2 gap-3">
+                    <button onClick={() => setSaleToDelete(null)} className="py-3 rounded-xl font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">Cancel</button>
+                    <button onClick={() => { onDeleteSale(saleToDelete); setSaleToDelete(null); }} className="py-3 rounded-xl font-bold bg-red-600 text-white shadow-lg shadow-red-500/30">Confirm Void</button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Left Column: Visual Receipt */}
       <div className="glass-panel p-6 rounded-2xl relative">
           <div id="receipt-container" className="bg-white text-slate-900 p-6 rounded-lg shadow-xl font-mono text-sm relative overflow-hidden">
@@ -169,7 +188,15 @@ export const DailyReport: React.FC<DailyReportProps> = ({
                          </div>
                          <div className="flex items-center gap-2">
                             <span className="font-bold text-slate-900">{formatCurrency(sale.price)}</span>
-                            <button onClick={() => onDeleteSale(sale)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-1 rounded" data-html2canvas-ignore><Trash2 className="w-3 h-3"/></button>
+                            <button 
+                                onClick={() => setSaleToDelete(sale)} 
+                                disabled={deletingIds.has(sale.id)}
+                                className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-all ml-2" 
+                                data-html2canvas-ignore
+                                title="Delete Sale"
+                            >
+                                {deletingIds.has(sale.id) ? <Loader2 className="w-3 h-3 animate-spin"/> : <Trash2 className="w-3 h-3"/>}
+                            </button>
                          </div>
                      </div>
                  ))}

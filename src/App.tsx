@@ -279,10 +279,8 @@ const App: React.FC = () => {
   const handleDeleteSale = async (sale: SaleItem) => {
     if (!isOnline) return addToast("⚠️ You are offline. Cannot delete sales.", 'error');
     
-    // Note: We are still using confirm() here for sales deletion as requested to focus on inventory, 
-    // but ideally this should also be replaced with a modal.
-    if(!confirm("Are you sure you want to void this transaction? Stock will be restored.")) return;
-
+    // Removed confirm() as requested to use custom modal in DailyReport
+    
     setDeletingIds(prev => new Set(prev).add(sale.id));
     
     try {
