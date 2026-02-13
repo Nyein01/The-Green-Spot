@@ -31,7 +31,8 @@ import {
   Palette,
   CheckCircle2,
   Users,
-  ArrowUpDown
+  ArrowUpDown,
+  BookOpen
 } from 'lucide-react';
 import { LoginForm } from './components/LoginForm';
 import { SalesForm } from './components/SalesForm';
@@ -39,6 +40,7 @@ import { InventoryManager } from './components/InventoryManager';
 import { DailyReport } from './components/DailyReport';
 import { ArchiveView } from './components/ArchiveView';
 import { ToastContainer, ToastMessage } from './components/Toast';
+import { UserGuide } from './components/UserGuide';
 import { 
   subscribeToSales, 
   subscribeToInventory,
@@ -102,6 +104,9 @@ const App: React.FC = () => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const loginTimeRef = useRef(Date.now());
   const [customAlertMsg, setCustomAlertMsg] = useState('');
+
+  // Guide State
+  const [showUserGuide, setShowUserGuide] = useState(false);
 
   // Language State
   const [language, setLanguage] = useState<Language>('en');
@@ -552,6 +557,23 @@ const App: React.FC = () => {
             
             <div className="space-y-8">
               
+               {/* User Guide Button (Newly Added) */}
+               <div className="bg-white/50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 backdrop-blur-sm flex items-center justify-between">
+                   <div>
+                       <div className="flex items-center text-gray-800 dark:text-white mb-1 font-bold text-lg">
+                           <BookOpen className="w-6 h-6 mr-2 text-green-600" />
+                           {t.helpCenter}
+                       </div>
+                       <p className="text-sm text-gray-500 dark:text-gray-400">View user manuals and tutorials.</p>
+                   </div>
+                   <button 
+                       onClick={() => setShowUserGuide(true)}
+                       className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-green-900/20"
+                   >
+                       {t.userGuide}
+                   </button>
+               </div>
+
               {/* Notification System */}
               <div className="bg-white/50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
                   <div className="flex items-center text-gray-800 dark:text-white mb-6 font-bold text-lg">
@@ -695,6 +717,9 @@ const App: React.FC = () => {
   return (
     <div className={`${theme === 'midnight' ? 'dark' : ''}`}>
       <ToastContainer toasts={toasts} onRemove={removeToast} />
+      {/* User Guide Modal */}
+      <UserGuide isOpen={showUserGuide} onClose={() => setShowUserGuide(false)} language={language} />
+
       <style>{`
         @keyframes slideInUp {
           from { opacity: 0; transform: translateY(15px); }
