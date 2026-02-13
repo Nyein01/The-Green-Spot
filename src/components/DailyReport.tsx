@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { SaleItem, InventoryItem, DayReport, Expense } from '../types';
 import { formatCurrency, generateId } from '../utils/pricing';
 import { saveDayReportToCloud } from '../services/storageService';
-import { generateSalesAnalysis } from '../services/geminiService';
-import { Download, TrendingUp, Save, LogOut, Wallet, Plus, Trash2, QrCode, Wand2, AlertTriangle, RefreshCw, Loader2, Leaf, Calendar, X } from 'lucide-react';
+import { Download, TrendingUp, Save, LogOut, Wallet, Plus, Trash2, QrCode, AlertTriangle, RefreshCw, Loader2, Leaf, Calendar, X } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -30,9 +29,6 @@ export const DailyReport: React.FC<DailyReportProps> = ({
   // Delete Modal State
   const [saleToDelete, setSaleToDelete] = useState<SaleItem | null>(null);
 
-  // AI State
-  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
-  const [loadingAi, setLoadingAi] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
 
@@ -41,13 +37,6 @@ export const DailyReport: React.FC<DailyReportProps> = ({
   const netIncome = totalRevenue - totalExpenses;
   const totalItems = sales.length;
   
-  const handleGenerateInsight = async () => {
-    setLoadingAi(true);
-    const result = await generateSalesAnalysis(sales, inventory);
-    setAiAnalysis(result);
-    setLoadingAi(false);
-  };
-
   const handleSaveAndArchive = async () => {
     setSavingReport(true);
     let shopId = shopName.toLowerCase().includes('near') ? 'nearcannabis' : 'greenspot';
@@ -256,43 +245,6 @@ export const DailyReport: React.FC<DailyReportProps> = ({
               </div>
           </div>
           
-          {/* AI Insight Card */}
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-indigo-100 dark:border-indigo-900/50 overflow-hidden relative group transition-colors">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 dark:bg-indigo-900/20 rounded-bl-full -mr-8 -mt-8 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
-            
-            <div className="flex items-center justify-between mb-4 relative z-10">
-              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
-                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg mr-3 text-indigo-600 dark:text-indigo-400">
-                  <Wand2 className="w-5 h-5" />
-                </div>
-                AI Insights
-              </h3>
-              <button
-                onClick={handleGenerateInsight}
-                disabled={loadingAi || sales.length === 0}
-                className={`text-xs px-4 py-2 rounded-full font-semibold transition-all shadow-sm ${
-                  loadingAi 
-                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-indigo-200 hover:shadow-lg active:scale-95'
-                }`}
-              >
-                {loadingAi ? 'Analyzing...' : 'Generate Analysis'}
-              </button>
-            </div>
-            
-            <div className="relative z-10 min-h-[60px]">
-              {aiAnalysis ? (
-                <div className="prose prose-sm prose-indigo dark:prose-invert text-gray-600 dark:text-gray-300 bg-indigo-50/50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/30 animate-fade-in-up">
-                  <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">{aiAnalysis}</pre>
-                </div>
-              ) : (
-                <div className="text-center py-4 text-gray-400 text-xs">
-                  <p>Generate smart insights about today's sales performance.</p>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Expenses */}
           <div className="glass-panel p-5 rounded-2xl">
               <h3 className="font-bold text-white mb-3 flex items-center"><Wallet className="w-4 h-4 mr-2 text-orange-400"/> Expenses</h3>
