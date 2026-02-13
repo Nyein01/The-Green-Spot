@@ -29,16 +29,23 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   
   // Transaction Global Settings
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Scan'>('Cash');
-  const [customerName, setCustomerName] = useState<string>('');
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const t = translations[language];
 
-  const availableItems = inventory.filter(i => 
-    i.category === productType && 
-    i.stockLevel > 0 &&
-    (searchQuery === '' || i.name.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Improved Search Logic:
+  // If query exists, search ALL categories.
+  // If query is empty, only show items in selected category.
+  const availableItems = inventory.filter(i => {
+    const hasStock = i.stockLevel > 0;
+    const q = searchQuery.toLowerCase().trim();
+    
+    if (q) {
+        return hasStock && i.name.toLowerCase().includes(q);
+    }
+    
+    return hasStock && i.category === productType;
+  });
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
 
@@ -90,8 +97,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
       isNegotiated: !isAutoPrice,
       staffName: staffName,
       paymentMethod: paymentMethod, // Placeholder, will be overwritten at checkout
-      discount: 0,
-      customerName: customerName // Placeholder
+      discount: 0
     };
 
     setCart([...cart, newItem]);
@@ -111,7 +117,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   const handleCheckout = () => {
     if (cart.length === 0) return;
 
-    // Apply global settings (Payment method, Customer Name, Timestamp) to all items
+    // Apply global settings (Payment method, Timestamp) to all items
     const timestamp = Date.now();
     const date = new Date().toISOString().split('T')[0];
 
@@ -121,7 +127,6 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
             timestamp,
             date,
             paymentMethod,
-            customerName: customerName || undefined,
             staffName: staffName
         };
         onSaleComplete(finalItem);
@@ -129,7 +134,6 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
 
     // Clear everything
     setCart([]);
-    setCustomerName('');
     setPaymentMethod('Cash');
   };
 
@@ -142,6 +146,16 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   }
 
   const handleSelectItem = (item: InventoryItem) => {
+    // Auto-switch product category if user searched and picked an item from a different category
+    if (item.category !== productType) {
+        setProductType(item.category);
+    }
+    
+    // Auto-set grade if applicable for Flower
+    if (item.category === ProductType.FLOWER && item.grade) {
+        setGrade(item.grade);
+    }
+
     setSelectedStrain(item.name);
     setSearchQuery(item.name);
     setIsDropdownOpen(false);
@@ -229,8 +243,14 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                         className="w-full text-left px-4 py-3 hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors flex justify-between items-center group"
                       >
                         <div>
-                          <div className="font-bold text-white flex items-center">
+                          <div className="font-bold text-white flex items-center gap-2">
                             {item.name}
+                            {/* Show Category Badge if searching globally */}
+                            {searchQuery && (
+                                <span className="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 font-normal uppercase">
+                                    {item.category}
+                                </span>
+                            )}
                             {selectedStrain === item.name && <Check className="w-4 h-4 ml-2 text-green-400" />}
                           </div>
                           <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
@@ -367,16 +387,6 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
               
               {/* Global Customer & Payment */}
               <div className="bg-slate-900/50 p-3 rounded-xl space-y-3">
-                 <div className="relative">
-                    <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
-                    <input 
-                        type="text" 
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        placeholder="Customer Name (Optional)"
-                        className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:border-green-500 outline-none"
-                    />
-                 </div>
                  <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700">
                      <button type="button" onClick={() => setPaymentMethod('Cash')} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-bold transition-all ${paymentMethod === 'Cash' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-white'}`}><Banknote className="w-3 h-3" /> {t.cash}</button>
                      <button type="button" onClick={() => setPaymentMethod('Scan')} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-bold transition-all ${paymentMethod === 'Scan' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-white'}`}><QrCode className="w-3 h-3" /> {t.scan}</button>
