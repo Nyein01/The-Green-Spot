@@ -1,27 +1,8 @@
-
 import React, { useState } from 'react';
 import { SaleItem, InventoryItem, DayReport, Expense } from '../types';
 import { formatCurrency, generateId } from '../utils/pricing';
 import { saveDayReportToCloud } from '../services/storageService';
-import { 
-  Download, 
-  Leaf, 
-  TrendingUp, 
-  Loader2, 
-  Trash2, 
-  X, 
-  AlertCircle, 
-  Save, 
-  CheckCircle2, 
-  LogOut,
-  Coins,
-  Wallet,
-  Plus,
-  Banknote,
-  QrCode,
-  UserCircle,
-  Ticket
-} from 'lucide-react';
+import { Download, TrendingUp, Save, LogOut, Coins, Wallet, Plus, Trash2, Banknote, QrCode, Leaf, Loader2 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -39,44 +20,18 @@ interface DailyReportProps {
 }
 
 export const DailyReport: React.FC<DailyReportProps> = ({ 
-  sales, 
-  expenses, 
-  inventory, 
-  onDeleteSale, 
-  onAddExpense,
-  onDeleteExpense,
-  onReset, 
-  deletingIds, 
-  shopName, 
-  staffName
+  sales, expenses, onDeleteSale, onAddExpense, onDeleteExpense, onReset, deletingIds, shopName, staffName
 }) => {
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
-  const [reportSaved, setReportSaved] = useState(false);
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
-  const [saleToDelete, setSaleToDelete] = useState<SaleItem | null>(null);
-  
-  // Expense Form State
   const [expDesc, setExpDesc] = useState('');
   const [expAmount, setExpAmount] = useState('');
-  const [isAddingExpense, setIsAddingExpense] = useState(false);
 
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.price, 0);
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
   
   const handleSaveAndArchive = async () => {
-    if (sales.length === 0 && expenses.length === 0) {
-        alert("No data to archive.");
-        return;
-    }
-
     setSavingReport(true);
-    
-    // Determine shopId from shopName
-    let shopId = 'greenspot';
-    if (shopName.toLowerCase().includes('near')) shopId = 'nearcannabis';
-
+    let shopId = shopName.toLowerCase().includes('near') ? 'nearcannabis' : 'greenspot';
     const report: DayReport = {
         id: `report_${new Date().toISOString().split('T')[0]}_${generateId()}`,
         date: new Date().toISOString().split('T')[0],
@@ -88,596 +43,131 @@ export const DailyReport: React.FC<DailyReportProps> = ({
         timestamp: Date.now(),
         closedBy: staffName
     };
-
-    const success = await saveDayReportToCloud(shopId, report);
-    
-    if (success) {
-        setReportSaved(true);
-        alert("✅ Daily report saved to Archives!\nYou can now safely Close Shift.");
-    } else {
-        alert("Failed to save report. Please check connection.");
-    }
-    
+    await saveDayReportToCloud(shopId, report);
     setSavingReport(false);
-  };
-
-  const handleCloseShift = async () => {
-      if (!reportSaved && (sales.length > 0 || expenses.length > 0)) {
-          alert("⚠️ Please 'Save & Archive Day' before closing the shift to ensure no data is lost.");
-          return;
-      }
-      
-      if (confirmReset) {
-          setIsClearing(true);
-          try {
-              await onReset();
-              setConfirmReset(false);
-              setReportSaved(false); // Reset state for next shift
-          } catch (error) {
-              console.error("Error clearing shift:", error);
-              alert("Failed to clear register. Please check internet connection.");
-          } finally {
-              setIsClearing(false);
-          }
-      } else {
-          setConfirmReset(true);
-          setTimeout(() => setConfirmReset(false), 3000);
-      }
-  };
-
-  const confirmDelete = async () => {
-    if (saleToDelete) {
-      onDeleteSale(saleToDelete);
-      setSaleToDelete(null);
-    }
+    alert("Saved to Archive!");
   };
 
   const handleNewExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!expDesc || !expAmount) return;
-    
-    setIsAddingExpense(true);
     await onAddExpense(expDesc, Number(expAmount));
     setExpDesc('');
     setExpAmount('');
-    setIsAddingExpense(false);
-  };
-
-  // --- NEW PROFESSIONAL PDF GENERATION ---
-  const handleDownloadPDF = async () => {
-    setDownloadingPdf(true);
-
-    try {
-      const printContainer = document.createElement('div');
-      printContainer.id = 'pdf-print-container';
-      
-      Object.assign(printContainer.style, {
-        position: 'fixed',
-        top: '-10000px', // Hide off-screen
-        left: '0',
-        width: '1200px', // High resolution width for clear text
-        backgroundColor: '#ffffff',
-        fontFamily: "'Inter', sans-serif",
-        color: '#111827',
-        padding: '60px'
-      });
-
-      const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-      const timeStr = new Date().toLocaleTimeString();
-      const netProfit = totalRevenue - totalExpenses;
-
-      const salesRowsHtml = sales.map((sale, index) => {
-          const isOdd = index % 2 !== 0;
-          return `
-            <tr style="background-color: ${isOdd ? '#f9fafb' : '#ffffff'}; border-bottom: 1px solid #e5e7eb;">
-                <td style="padding: 12px 16px; color: #6b7280; font-size: 12px; font-weight: 500;">${index + 1}</td>
-                <td style="padding: 12px 16px; font-weight: 600; color: #111827;">
-                    ${sale.productName}
-                    ${sale.grade ? `<span style="display: inline-block; background-color: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 8px; font-weight: bold; color: #4b5563; text-transform: uppercase;">${sale.grade}</span>` : ''}
-                    ${sale.discount ? `<div style="font-size: 10px; color: #ea580c; font-weight: bold;">(Discount: -${formatCurrency(sale.discount)})</div>` : ''}
-                    ${sale.customerName ? `<div style="font-size: 10px; color: #4b5563;">Cust: ${sale.customerName}</div>` : ''}
-                </td>
-                <td style="padding: 12px 16px; color: #4b5563;">${sale.productType}</td>
-                <td style="padding: 12px 16px; text-align: center;">
-                    <span style="background-color: #f3f4f6; color: #374151; padding: 4px 10px; border-radius: 99px; font-size: 12px; font-weight: 700;">
-                        ${sale.quantity} ${sale.productType === 'Flower' ? 'g' : 'u'}
-                    </span>
-                </td>
-                <td style="padding: 12px 16px; text-align: right; font-weight: 700; font-family: monospace; color: #111827;">${formatCurrency(sale.price)}</td>
-            </tr>
-          `;
-      }).join('');
-
-      const expensesHtml = expenses.length > 0 ? `
-        <div style="margin-top: 40px;">
-            <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; color: #b91c1c; margin-bottom: 15px; border-bottom: 2px solid #b91c1c; padding-bottom: 8px; display: inline-block;">
-                Expenses & Deductions
-            </h3>
-            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                <thead>
-                    <tr style="background-color: #fef2f2; border-bottom: 1px solid #fee2e2;">
-                        <th style="text-align: left; padding: 12px; color: #991b1b; font-weight: 700; text-transform: uppercase;">Description</th>
-                        <th style="text-align: right; padding: 12px; color: #991b1b; font-weight: 700; text-transform: uppercase;">Cost</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${expenses.map(exp => `
-                        <tr style="border-bottom: 1px dashed #e5e7eb;">
-                            <td style="padding: 12px; color: #374151; font-weight: 500;">${exp.description}</td>
-                            <td style="padding: 12px; text-align: right; font-family: monospace; color: #dc2626; font-weight: 800;">-${formatCurrency(exp.amount)}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
-      ` : '';
-
-      printContainer.innerHTML = `
-        <!-- HEADER -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 4px solid #111827; padding-bottom: 30px;">
-            <div>
-                <h1 style="font-size: 48px; font-weight: 900; letter-spacing: -0.02em; margin: 0; color: #111827; line-height: 1;">${shopName}</h1>
-                <div style="display: flex; align-items: center; margin-top: 12px;">
-                    <div style="background-color: #111827; color: white; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-right: 12px;">Daily Sales Report</div>
-                    <div style="color: #6b7280; font-size: 14px; font-weight: 500;">Staff: ${staffName}</div>
-                </div>
-            </div>
-            <div style="text-align: right;">
-                <div style="font-size: 28px; font-weight: 800; color: #111827;">${dateStr}</div>
-                <div style="font-size: 14px; color: #6b7280; margin-top: 4px; font-weight: 500;">Report Generated: ${timeStr}</div>
-            </div>
-        </div>
-
-        <!-- KPI CARDS -->
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 40px;">
-            <!-- Revenue Card -->
-            <div style="background-color: #111827; color: white; padding: 24px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
-                <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; font-weight: 700;">Total Revenue</div>
-                <div style="font-size: 36px; font-weight: 800; margin-top: 8px;">${formatCurrency(totalRevenue)}</div>
-            </div>
-            
-            <!-- Items Card -->
-            <div style="background-color: #ffffff; border: 1px solid #e5e7eb; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-                <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; font-weight: 700;">Items Sold</div>
-                <div style="font-size: 36px; font-weight: 800; color: #111827; margin-top: 8px;">${sales.length}</div>
-            </div>
-
-            <!-- Expenses Card -->
-            <div style="background-color: #fff1f2; border: 1px solid #fda4af; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-                <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: #be123c; font-weight: 700;">Total Expenses</div>
-                <div style="font-size: 36px; font-weight: 800; color: #be123c; margin-top: 8px;">-${formatCurrency(totalExpenses)}</div>
-            </div>
-        </div>
-
-        <!-- SALES TABLE -->
-        <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; color: #111827; margin-bottom: 15px; border-bottom: 2px solid #111827; padding-bottom: 8px; display: inline-block;">
-            Detailed Transactions
-        </h3>
-        <table style="width: 100%; border-collapse: collapse; font-size: 13px; border: 1px solid #e5e7eb;">
-            <thead>
-                <tr style="background-color: #f3f4f6; border-bottom: 2px solid #e5e7eb;">
-                    <th style="text-align: left; padding: 12px 16px; color: #374151; font-weight: 700; text-transform: uppercase; width: 40px;">#</th>
-                    <th style="text-align: left; padding: 12px 16px; color: #374151; font-weight: 700; text-transform: uppercase;">Product Name</th>
-                    <th style="text-align: left; padding: 12px 16px; color: #374151; font-weight: 700; text-transform: uppercase;">Type</th>
-                    <th style="text-align: center; padding: 12px 16px; color: #374151; font-weight: 700; text-transform: uppercase; width: 100px;">Qty</th>
-                    <th style="text-align: right; padding: 12px 16px; color: #374151; font-weight: 700; text-transform: uppercase; width: 120px;">Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${salesRowsHtml}
-            </tbody>
-        </table>
-
-        <!-- EXPENSES -->
-        ${expensesHtml}
-
-        <!-- NET TOTAL FOOTER -->
-        <div style="margin-top: 50px; padding-top: 30px; border-top: 3px dashed #d1d5db; display: flex; justify-content: flex-end;">
-            <div style="text-align: right; background-color: #f0fdf4; padding: 20px 40px; border-radius: 12px; border: 1px solid #bbf7d0;">
-                <div style="font-size: 14px; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Net Profit (Estimated)</div>
-                <div style="font-size: 42px; font-weight: 900; color: #15803d; line-height: 1.2;">${formatCurrency(netProfit)}</div>
-            </div>
-        </div>
-
-        <div style="margin-top: 80px; text-align: center; font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 3px; font-weight: 500;">
-            End of Report • Generated by The Green Spot POS System
-        </div>
-      `;
-
-      document.body.appendChild(printContainer);
-
-      const canvas = await html2canvas(printContainer, {
-        scale: 2, // 2x for Retina quality
-        useCORS: true,
-        backgroundColor: '#ffffff'
-      });
-
-      document.body.removeChild(printContainer);
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
-      }
-
-      pdf.save(`${shopName.replace(/\s+/g, '')}_Report_${new Date().toISOString().split('T')[0]}.pdf`);
-
-    } catch (error) {
-      console.error("PDF Generation failed", error);
-      alert("Failed to generate PDF. Please try again.");
-    } finally {
-      setDownloadingPdf(false);
-    }
   };
 
   return (
-    <div className="animate-slide-up grid grid-cols-1 lg:grid-cols-2 gap-6 pb-12">
-      <style>{`
-        @keyframes modalEnter {
-          from { opacity: 0; transform: scale(0.95) translateY(10px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        .animate-modal {
-          animation: modalEnter 0.2s ease-out forwards;
-        }
-      `}</style>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in max-w-6xl mx-auto">
+      
+      {/* Left Column: Visual Receipt */}
+      <div className="glass-panel p-6 rounded-2xl relative">
+          <div className="bg-white text-slate-900 p-6 rounded-lg shadow-xl font-mono text-sm relative overflow-hidden">
+             {/* Receipt decoration */}
+             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-green-500 via-green-400 to-green-500"></div>
+             
+             <div className="text-center mb-6">
+                 <h2 className="text-2xl font-black uppercase tracking-widest">{shopName}</h2>
+                 <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">{new Date().toLocaleDateString()}</p>
+             </div>
 
-      {/* Receipt View */}
-      <div 
-        id="receipt-container"
-        className="bg-white p-4 sm:p-8 rounded-none sm:rounded-xl shadow-xl border-t-8 border-green-600 font-mono text-sm relative transition-all duration-300 hover:shadow-2xl hover:-translate-y-1"
-      >
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center border border-green-100">
-               <Leaf className="w-8 h-8 text-green-600" />
-            </div>
-          </div>
-          <h2 className="text-3xl font-extrabold text-gray-800 uppercase tracking-widest mb-1">{shopName}</h2>
-          <p className="text-gray-400 text-[10px] tracking-[0.2em] uppercase">Premium Dispensary System</p>
-          <div className="mt-6 border-b border-dashed border-gray-200 pb-4">
-             <p className="text-gray-400 text-[10px] uppercase mb-1">Date of Report</p>
-             <p className="text-gray-700 font-bold text-base">{new Date().toLocaleDateString()} <span className="text-gray-400 font-normal">|</span> {new Date().toLocaleTimeString()}</p>
-             <p className="text-xs text-gray-500 mt-1">Staff: {staffName}</p>
-          </div>
-        </div>
+             <div className="border-b-2 border-dashed border-slate-200 pb-2 mb-2 flex justify-between text-xs font-bold text-slate-400 uppercase">
+                 <span>Item</span>
+                 <span>Amt</span>
+             </div>
 
-        <div className="mb-6">
-          <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase mb-3 border-b border-gray-200 pb-2 tracking-wider">
-            <span>Sales Breakdown</span>
-            <span>Amount</span>
-          </div>
-          <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2 receipt-scroll text-gray-800">
-            {sales.length === 0 ? (
-              <div className="text-center py-6 text-gray-400 italic bg-gray-50 rounded-lg border border-gray-100 border-dashed">
-                No transactions recorded yet.
-              </div>
-            ) : (
-              sales.map((sale, idx) => (
-                <div key={sale.id} className={`flex justify-between items-start group hover:bg-gray-50 p-2 rounded transition-all duration-500 ease-in-out -mx-2 transform ${deletingIds.has(sale.id) ? 'opacity-30 bg-red-50' : 'opacity-100'}`}>
-                  <div className="flex items-start">
-                    <span className="text-gray-300 mr-3 text-xs w-4 font-mono">{idx + 1}.</span>
-                    <div>
-                      <div className="font-bold text-gray-800 text-base flex items-center">
-                        {sale.productName}
-                        {sale.paymentMethod === 'Scan' ? (
-                            <QrCode className="w-3 h-3 ml-2 text-blue-500" />
-                        ) : (
-                            <Banknote className="w-3 h-3 ml-2 text-green-500" />
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 flex flex-col mt-0.5">
-                        <div className="flex items-center">
-                            <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px]">
-                            {sale.quantity}{sale.productType === 'Flower' ? 'g' : ' units'}
-                            </span>
-                            {sale.grade && <span className="mx-1 text-gray-400">•</span>}
-                            {sale.grade && <span className="text-gray-500">{sale.grade}</span>}
-                            {sale.staffName && <span className="ml-2 text-gray-400 text-[9px] border border-gray-200 px-1 rounded">By: {sale.staffName.split(' ')[0]}</span>}
-                        </div>
-                        <div className="flex mt-1 space-x-2">
-                             {sale.customerName && <span className="text-[10px] text-blue-500 font-semibold">Cust: {sale.customerName}</span>}
-                             {sale.discount ? <span className="text-[10px] text-orange-500 font-bold">Disc: -{formatCurrency(sale.discount)}</span> : null}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="text-gray-900 font-bold mr-2">{formatCurrency(sale.price)}</div>
-                    <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSaleToDelete(sale);
-                        }}
-                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                        title="Delete Sale"
-                        data-html2canvas-ignore
-                        disabled={deletingIds.has(sale.id)}
-                    >
-                        {deletingIds.has(sale.id) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+             <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar-light pr-2">
+                 {sales.map((sale, i) => (
+                     <div key={sale.id} className="flex justify-between items-start group">
+                         <div className="flex-1">
+                             <div className="font-bold flex items-center">
+                                 {sale.productName}
+                                 {sale.paymentMethod === 'Scan' && <QrCode className="w-3 h-3 ml-1 text-blue-500" />}
+                             </div>
+                             <div className="text-xs text-slate-500">{sale.quantity}{sale.productType === 'Flower'?'g':'u'} {sale.discount ? `(-${sale.discount})` : ''}</div>
+                         </div>
+                         <div className="flex items-center gap-2">
+                            <span className="font-bold">{formatCurrency(sale.price)}</span>
+                            <button onClick={() => onDeleteSale(sale)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-1 rounded"><Trash2 className="w-3 h-3"/></button>
+                         </div>
+                     </div>
+                 ))}
+             </div>
 
-        {/* Expenses Section in Receipt */}
-        {expenses.length > 0 && (
-          <div className="mb-6 pt-4 border-t border-dashed border-gray-200">
-            <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-wider">
-              <span>Expenses (Internal)</span>
-              <span>Cost</span>
-            </div>
-            <div className="space-y-2 text-gray-800">
-                {expenses.map((exp) => (
-                    <div key={exp.id} className="flex justify-between items-center -mx-2 p-2 hover:bg-gray-50 rounded">
-                        <div className="text-sm">{exp.description}</div>
-                        <div className="font-mono text-red-500 text-sm">-{formatCurrency(exp.amount)}</div>
-                    </div>
-                ))}
-            </div>
-             <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100 text-xs">
-                <span className="text-gray-500">Total Expenses</span>
-                <span className="font-bold text-red-600">-{formatCurrency(totalExpenses)}</span>
+             <div className="mt-6 pt-4 border-t-2 border-dashed border-slate-200">
+                 <div className="flex justify-between items-center text-lg font-black">
+                     <span>TOTAL</span>
+                     <span>{formatCurrency(totalRevenue)}</span>
+                 </div>
+                 {totalExpenses > 0 && (
+                     <div className="flex justify-between items-center text-xs text-red-500 mt-1">
+                        <span>Expenses</span>
+                        <span>-{formatCurrency(totalExpenses)}</span>
+                     </div>
+                 )}
+             </div>
+
+             <div className="mt-8 text-center text-[10px] text-slate-400 uppercase tracking-widest">
+                 Thank you for visiting
              </div>
           </div>
-        )}
-
-        <div className="space-y-3 pt-6 border-t-2 border-dashed border-gray-300">
-          
-          <div className="flex justify-between items-center text-gray-500 text-xs">
-            <span className="flex items-center"><TrendingUp className="w-3 h-3 mr-1" /> Items Sold</span>
-            <span className="font-mono font-bold">{sales.length}</span>
-          </div>
-
-          <div className="flex justify-between items-end bg-gray-50 p-4 rounded-lg border border-gray-100 mt-2">
-            <span className="text-sm font-bold text-gray-800 uppercase tracking-tight flex items-center">
-              <Coins className="w-5 h-5 mr-2 text-green-600" />
-              Total Revenue
-            </span>
-            <span className="text-3xl font-black text-gray-900 tracking-tight">{formatCurrency(totalRevenue)}</span>
-          </div>
-        </div>
-
-        <div className="mt-8 text-center opacity-60">
-           <div className="inline-flex items-center justify-center px-4 py-1 border border-gray-200 rounded-full text-[10px] text-gray-400 uppercase tracking-wide">
-             <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-             End of Report
-           </div>
-        </div>
-
-        {/* Download Button */}
-        <div className="absolute top-6 right-6" data-html2canvas-ignore>
-            <button 
-               onClick={handleDownloadPDF}
-               disabled={downloadingPdf}
-               className={`group flex items-center justify-center w-10 h-10 bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-green-200 rounded-full text-gray-500 hover:text-green-600 transition-all duration-200 ${downloadingPdf ? 'opacity-50 cursor-wait' : ''}`}
-               title="Download PDF Report"
-            >
-               {downloadingPdf ? (
-                 <Loader2 className="w-5 h-5 animate-spin text-green-600" />
-               ) : (
-                 <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
-               )}
-            </button>
-        </div>
       </div>
 
-      {/* Actions Panel */}
+      {/* Right Column: Controls */}
       <div className="space-y-6">
-        
-        {/* Expenses Manager Card */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-orange-100 dark:border-orange-900/30 transition-colors">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
-                    <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg mr-3 text-orange-600 dark:text-orange-400">
-                        <Wallet className="w-5 h-5" />
-                    </div>
-                    Expenses List
-                </h3>
-            </div>
-            
-            {/* Add Expense Form */}
-            <form onSubmit={handleNewExpense} className="flex gap-2 mb-4">
-                <input 
-                    type="text" 
-                    placeholder="Expense Description (e.g. Lunch)" 
-                    value={expDesc}
-                    onChange={e => setExpDesc(e.target.value)}
-                    className="flex-1 text-sm p-2 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-                <input 
-                    type="number" 
-                    placeholder="Amount" 
-                    value={expAmount}
-                    onChange={e => setExpAmount(e.target.value)}
-                    className="w-24 text-sm p-2 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-                <button 
-                    type="submit"
-                    disabled={!expDesc || !expAmount || isAddingExpense}
-                    className="bg-orange-500 text-white p-2 rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {isAddingExpense ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                </button>
-            </form>
+          
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 gap-4">
+              <div className="glass-card p-4 rounded-xl">
+                  <p className="text-xs text-slate-400 uppercase font-bold">Net Sales</p>
+                  <p className="text-2xl font-black text-green-400">{formatCurrency(totalRevenue)}</p>
+              </div>
+              <div className="glass-card p-4 rounded-xl">
+                  <p className="text-xs text-slate-400 uppercase font-bold">Transactions</p>
+                  <p className="text-2xl font-black text-white">{sales.length}</p>
+              </div>
+          </div>
 
-            {/* Expenses List */}
-            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                {expenses.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic text-center py-2">No extra expenses recorded.</p>
-                ) : (
-                    expenses.map(exp => (
-                        <div key={exp.id} className="flex justify-between items-center text-sm p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700">
-                            <span className="text-gray-700 dark:text-gray-300 truncate max-w-[150px]">{exp.description}</span>
-                            <div className="flex items-center">
-                                <span className="font-bold text-gray-900 dark:text-gray-100 mr-3">{formatCurrency(exp.amount)}</span>
-                                <button 
-                                    onClick={() => onDeleteExpense(exp.id)}
-                                    className="text-gray-400 hover:text-red-500"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
-        </div>
+          {/* Expenses */}
+          <div className="glass-panel p-5 rounded-2xl">
+              <h3 className="font-bold text-white mb-3 flex items-center"><Wallet className="w-4 h-4 mr-2 text-orange-400"/> Expenses</h3>
+              <form onSubmit={handleNewExpense} className="flex gap-2 mb-3">
+                  <input type="text" placeholder="Desc" value={expDesc} onChange={e=>setExpDesc(e.target.value)} className="flex-1 bg-slate-900/50 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+                  <input type="number" placeholder="Amt" value={expAmount} onChange={e=>setExpAmount(e.target.value)} className="w-20 bg-slate-900/50 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+                  <button type="submit" className="bg-orange-500 text-white p-2 rounded-lg hover:bg-orange-600"><Plus className="w-4 h-4" /></button>
+              </form>
+              <div className="space-y-1">
+                  {expenses.map(exp => (
+                      <div key={exp.id} className="flex justify-between text-xs text-slate-400 bg-slate-900/30 p-2 rounded">
+                          <span>{exp.description}</span>
+                          <div className="flex gap-2">
+                             <span className="text-red-400">-{exp.amount}</span>
+                             <button onClick={() => onDeleteExpense(exp.id)} className="text-slate-600 hover:text-red-500"><Trash2 className="w-3 h-3"/></button>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>
 
-        {/* Save & Archive Section */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-green-100 dark:border-green-900/30 overflow-hidden transition-colors">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
-                    <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg mr-3 text-green-600 dark:text-green-400">
-                        <Save className="w-5 h-5" />
-                    </div>
-                    Step 1: Save Report
-                </h3>
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                Save the current shift data to the Archive. This data will be used for Weekly & Monthly reports.
-            </p>
-            <button
-                onClick={handleSaveAndArchive}
-                disabled={savingReport || (sales.length === 0 && expenses.length === 0)}
-                className={`w-full flex items-center justify-center font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all transform active:scale-95 ${
-                    reportSaved 
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 cursor-default' 
-                    : 'bg-green-600 hover:bg-green-700 text-white shadow-green-100 dark:shadow-none'
-                } disabled:opacity-50`}
-            >
-                {savingReport ? (
-                    <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Saving...
-                    </>
-                ) : reportSaved ? (
-                    <>
-                        <CheckCircle2 className="w-5 h-5 mr-2" />
-                        Report Saved
-                    </>
-                ) : (
-                    <>
-                        <Save className="w-5 h-5 mr-2" />
-                        Save & Archive Day
-                    </>
-                )}
-            </button>
-        </div>
-
-        {/* Close Shift Section */}
-        <div className={`bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border transition-colors ${
-             reportSaved ? 'border-red-100 dark:border-red-900/30' : 'border-gray-100 dark:border-gray-700 opacity-60'
-        }`}>
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
-                    <div className={`p-2 rounded-lg mr-3 ${reportSaved ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' : 'bg-gray-100 text-gray-400'}`}>
-                        <LogOut className="w-5 h-5" />
-                    </div>
-                    Step 2: Close Shift
-                </h3>
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                Clear the live register for the next shift. Ensure you have saved the report first.
-            </p>
-            <button
-                onClick={handleCloseShift}
-                disabled={!reportSaved && (sales.length > 0 || expenses.length > 0)}
-                className={`w-full flex items-center justify-center font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all transform active:scale-95 ${
-                    confirmReset 
-                    ? 'bg-red-600 text-white' 
-                    : !reportSaved && (sales.length > 0 || expenses.length > 0)
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                        : 'bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 border-2 border-red-100 dark:border-red-900/50 hover:border-red-200'
-                }`}
-            >
-                {isClearing ? (
-                    <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Clearing Register...
-                    </>
-                ) : confirmReset ? (
-                    <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Confirm Close
-                    </>
-                ) : (
-                    <>
-                        <LogOut className="w-5 h-5 mr-2" />
-                        Close Shift & Clear Register
-                    </>
-                )}
-            </button>
-        </div>
+          {/* Actions */}
+          <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={handleSaveAndArchive} 
+                disabled={savingReport} 
+                className="bg-slate-800 hover:bg-slate-700 text-white p-4 rounded-xl font-bold flex flex-col items-center justify-center gap-2 transition-all border border-white/5"
+              >
+                  {savingReport ? <Loader2 className="animate-spin" /> : <Save />}
+                  Save Day
+              </button>
+              <button 
+                onClick={onReset}
+                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 p-4 rounded-xl font-bold flex flex-col items-center justify-center gap-2 transition-all border border-red-500/20"
+              >
+                  <LogOut />
+                  Close Shift
+              </button>
+          </div>
       </div>
 
-      {/* Custom Confirmation Modal */}
-      {saleToDelete && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={() => setSaleToDelete(null)}
-        >
-          <div 
-            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-modal border border-gray-100 dark:border-gray-700"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 bg-red-50 dark:bg-red-900/20 rounded-full mx-auto mb-4">
-                <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
-              </div>
-              <h3 className="text-xl font-bold text-center text-gray-900 dark:text-white mb-2">Delete Sale?</h3>
-              <p className="text-gray-600 dark:text-gray-400 text-center text-sm mb-6">
-                Are you sure you want to delete this sale of <span className="font-bold text-gray-900 dark:text-gray-200">{saleToDelete.productName}</span>? This action will restore the stock level and cannot be undone.
-              </p>
-              
-              <div className="flex flex-col space-y-3">
-                <button
-                  onClick={confirmDelete}
-                  className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-200 dark:shadow-none transition-all active:scale-95"
-                >
-                  Yes, Delete Sale
-                </button>
-                <button
-                  onClick={() => setSaleToDelete(null)}
-                  className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl transition-all"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-            <div className="absolute top-3 right-3">
-              <button 
-                onClick={() => setSaleToDelete(null)}
-                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

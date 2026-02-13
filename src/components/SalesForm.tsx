@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { ProductType, FlowerGrade, InventoryItem, SaleItem } from '../types';
 import { calculateFlowerPrice, formatCurrency, generateId } from '../utils/pricing';
@@ -21,11 +20,9 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   const [grade, setGrade] = useState<FlowerGrade>(FlowerGrade.MID);
   const [quantity, setQuantity] = useState<number>(1);
   const [price, setPrice] = useState<number>(0);
-  const [basePrice, setBasePrice] = useState<number>(0); // Price before discount
+  const [basePrice, setBasePrice] = useState<number>(0); 
   const [isAutoPrice, setIsAutoPrice] = useState<boolean>(true);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Scan'>('Cash');
-  
-  // New Features State
   const [customerName, setCustomerName] = useState<string>('');
   const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'FIXED'>('NONE');
   const [discountValue, setDiscountValue] = useState<number>(0);
@@ -33,14 +30,12 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   const dropdownRef = useRef<HTMLDivElement>(null);
   const t = translations[language];
 
-  // Filter inventory based on selected type and search query
   const availableItems = inventory.filter(i => 
     i.category === productType && 
     i.stockLevel > 0 &&
     (searchQuery === '' || i.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -51,46 +46,35 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Auto-calculate BASE price when dependencies change
   useEffect(() => {
     let calculated = 0;
     if (productType === ProductType.FLOWER) {
       const item = inventory.find(i => i.name === selectedStrain && i.category === ProductType.FLOWER);
       const effectiveGrade = item?.grade || grade;
-      
-      if (item && item.grade && item.grade !== grade) {
-        setGrade(item.grade);
-      }
+      if (item && item.grade && item.grade !== grade) setGrade(item.grade);
       calculated = calculateFlowerPrice(effectiveGrade, quantity);
     } else {
         const item = inventory.find(i => i.name === selectedStrain && i.category === productType);
-        if (item && item.price) {
-            calculated = item.price * quantity;
-        }
+        if (item && item.price) calculated = item.price * quantity;
     }
     setBasePrice(calculated);
   }, [productType, selectedStrain, grade, quantity, inventory]);
 
-  // Apply Discount Logic to Final Price
   useEffect(() => {
-    if (!isAutoPrice) return; // If manual override, ignore calc
-
+    if (!isAutoPrice) return;
     let final = basePrice;
-    
     if (discountType === 'PERCENT') {
         const amountOff = basePrice * (discountValue / 100);
         final = basePrice - amountOff;
     } else if (discountType === 'FIXED') {
         final = Math.max(0, basePrice - discountValue);
     }
-
     setPrice(final);
   }, [basePrice, discountType, discountValue, isAutoPrice]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!selectedStrain) return alert("Please select a product.");
+    if (!selectedStrain) return;
 
     const sale: SaleItem = {
       id: generateId(),
@@ -101,7 +85,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
       grade: productType === ProductType.FLOWER ? grade : undefined,
       quantity,
       price: Number(price),
-      originalPrice: basePrice, // Track what it should have been
+      originalPrice: basePrice,
       isNegotiated: !isAutoPrice,
       staffName: staffName,
       paymentMethod: paymentMethod,
@@ -110,8 +94,6 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
     };
 
     onSaleComplete(sale);
-    
-    // Reset fields
     setQuantity(1);
     setIsAutoPrice(true);
     setSearchQuery('');
@@ -141,46 +123,33 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   const visibleTypes = Object.values(ProductType).filter(t => t !== ProductType.OTHER);
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors animate-fade-in relative overflow-hidden">
+    <div className="glass-panel p-6 rounded-2xl relative animate-fade-in max-w-3xl mx-auto">
       
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold flex items-center text-gray-800 dark:text-gray-100">
-            <ShoppingCart className="w-5 h-5 mr-2 text-green-600 dark:text-green-500" />
-            {t.newSale}
-        </h2>
-        <div className="flex items-center space-x-2">
-            <span className="text-xs font-normal text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
-                {staffName}
-            </span>
-        </div>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Product Type Selection */}
-        <div className="grid grid-cols-4 gap-2">
+      {/* Product Type Tabs */}
+      <div className="bg-slate-900/50 p-1 rounded-xl flex gap-1 mb-6 border border-white/5 overflow-x-auto">
           {visibleTypes.map((type) => (
             <button
               key={type}
               type="button"
               onClick={() => handleTypeChange(type)}
-              className={`px-2 py-2 sm:px-3 text-xs sm:text-sm font-medium rounded-lg transition-all transform hover:scale-105 ${
+              className={`flex-1 min-w-[80px] py-2 px-3 text-xs font-bold rounded-lg transition-all duration-300 ${
                 productType === type
-                  ? 'bg-green-600 text-white shadow-md'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  ? 'bg-gradient-to-br from-green-500 to-emerald-700 text-white shadow-lg shadow-green-900/40'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
               {type}
             </button>
           ))}
-        </div>
+      </div>
 
-        {/* Searchable Product Selection */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        
+        {/* Search Input */}
         <div className="relative" ref={dropdownRef}>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t.productStrain}</label>
+          <label className="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">{t.productStrain}</label>
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400 group-focus-within:text-green-500 transition-colors" />
-            </div>
+            <Search className="absolute left-4 top-3.5 h-4 w-4 text-slate-500 group-focus-within:text-green-400 transition-colors" />
             <input
               type="text"
               value={searchQuery}
@@ -190,48 +159,37 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                 setIsDropdownOpen(true);
               }}
               placeholder={t.searchPlaceholder}
-              className="w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm transition-all"
+              className="w-full pl-11 pr-10 py-3 bg-slate-900/60 border border-slate-700/50 rounded-xl text-sm text-white focus:ring-1 focus:ring-green-500 focus:border-green-500/50 transition-all outline-none"
             />
             {searchQuery && (
-                <button 
-                  type="button"
-                  onClick={() => { setSearchQuery(''); setSelectedStrain(''); }}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                >
+                <button type="button" onClick={() => { setSearchQuery(''); setSelectedStrain(''); }} className="absolute right-3 top-3.5 text-slate-500 hover:text-white">
                   <X className="h-4 w-4" />
                 </button>
             )}
           </div>
 
-          {/* Dropdown Results */}
           {isDropdownOpen && (
-            <div className="absolute z-30 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="absolute z-30 mt-2 w-full bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto custom-scrollbar">
               {availableItems.length === 0 ? (
-                <div className="p-4 text-center text-sm text-gray-500 italic dark:text-gray-400">
-                  {inventory.filter(i => i.category === productType).length === 0 
-                    ? `No ${productType} items in stock.` 
-                    : "No matching items found."}
-                </div>
+                <div className="p-4 text-center text-sm text-slate-500 italic">No items found.</div>
               ) : (
                 availableItems.map((item) => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => handleSelectItem(item)}
-                    className={`w-full text-left px-4 py-3 flex justify-between items-center hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors border-b last:border-0 border-gray-50 dark:border-gray-700 ${selectedStrain === item.name ? 'bg-green-50 dark:bg-green-900/30' : ''}`}
+                    className="w-full text-left px-4 py-3 hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors flex justify-between items-center group"
                   >
                     <div>
-                      <div className="font-bold text-gray-900 dark:text-white flex items-center">
+                      <div className="font-bold text-white flex items-center">
                         {item.name}
-                        {selectedStrain === item.name && <Check className="w-4 h-4 ml-2 text-green-500" />}
+                        {selectedStrain === item.name && <Check className="w-4 h-4 ml-2 text-green-400" />}
                       </div>
-                      <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-tight flex items-center mt-0.5">
-                        {item.grade ? <span className="mr-2 font-bold text-blue-500 dark:text-blue-400">{item.grade}</span> : null}
-                        {item.price ? <span className="mr-2">{item.price} ฿</span> : null}
-                        <span>{t.stock}: {item.stockLevel} {productType === ProductType.FLOWER ? 'g' : 'pcs'}</span>
+                      <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
+                         {item.grade && <span className="bg-slate-700 px-1.5 rounded text-slate-300">{item.grade}</span>}
+                         <span className={item.stockLevel < 10 ? "text-amber-500" : ""}>{t.stock}: {item.stockLevel}</span>
                       </div>
                     </div>
-                    <ChevronDown className="w-4 h-4 text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
                 ))
               )}
@@ -239,216 +197,119 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
           )}
         </div>
 
-        {/* Flower Specifics: Grade */}
-        {productType === ProductType.FLOWER && (
-          <div className="animate-in fade-in slide-in-from-left-2 duration-300">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t.grade}</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {Object.values(FlowerGrade).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => {
-                    setGrade(g);
-                    setIsAutoPrice(true);
-                    setDiscountType('NONE');
-                  }}
-                  className={`px-2 py-2 text-xs font-semibold rounded-md border transition-all ${
-                    grade === g
-                      ? 'bg-green-50 dark:bg-green-900/40 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 ring-1 ring-green-500 transform scale-105 shadow-sm'
-                      : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  {g}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Grade & Quantity Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {productType === ProductType.FLOWER && (
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">{t.grade}</label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {Object.values(FlowerGrade).map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => { setGrade(g); setIsAutoPrice(true); setDiscountType('NONE'); }}
+                      className={`py-2 px-1 text-[10px] font-bold uppercase rounded-lg border transition-all ${
+                        grade === g
+                          ? 'bg-green-500/20 border-green-500 text-green-400'
+                          : 'bg-transparent border-slate-700 text-slate-500 hover:border-slate-500'
+                      }`}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-        {/* Quantity */}
-        <div className="animate-in fade-in slide-in-from-left-2 duration-300 delay-75">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            {t.quantity} {productType === ProductType.FLOWER ? '(grams)' : '(units)'}
-          </label>
-          <div className="flex items-center space-x-2">
-            <button
-              type="button"
-              onClick={() => {
-                setQuantity(Math.max(productType === ProductType.FLOWER ? 0.5 : 1, quantity - (productType === ProductType.FLOWER ? 0.5 : 1)));
-              }}
-              className="p-3 sm:p-2 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 touch-manipulation transition-colors"
-            >
-              -
-            </button>
-            <input
-              type="number"
-              step={productType === ProductType.FLOWER ? "0.1" : "1"}
-              value={quantity}
-              onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
-              className="w-full text-center border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg shadow-sm p-3 sm:p-2 border focus:ring-2 focus:ring-green-500 outline-none font-bold"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setQuantity(quantity + (productType === ProductType.FLOWER ? 0.5 : 1));
-              }}
-              className="p-3 sm:p-2 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 touch-manipulation transition-colors"
-            >
-              +
-            </button>
-          </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">
+                {t.quantity} <span className="text-slate-600 normal-case">({productType === ProductType.FLOWER ? 'grams' : 'units'})</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setQuantity(Math.max(0.5, quantity - 0.5))} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center font-bold transition-colors">-</button>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={quantity}
+                  onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
+                  className="flex-1 h-10 bg-slate-900/60 border border-slate-700 rounded-lg text-center text-white font-mono font-bold focus:border-green-500 outline-none"
+                />
+                <button type="button" onClick={() => setQuantity(quantity + 0.5)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center font-bold transition-colors">+</button>
+              </div>
+            </div>
         </div>
 
-        {/* --- CUSTOMER & DISCOUNT SECTION --- */}
-        <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-left-2 duration-300 delay-100">
-           
-           {/* Customer Name */}
-           <div className="col-span-2 sm:col-span-1">
-             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Customer (Optional)</label>
-             <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                   <User className="h-4 w-4 text-gray-400" />
-                </div>
-                <input 
-                  type="text" 
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Guest / Member ID"
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-1 focus:ring-green-500"
-                />
-             </div>
-           </div>
-
-           {/* Discount Toggles */}
-           <div className="col-span-2 sm:col-span-1">
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Discount</label>
-              <div className="flex space-x-2">
-                 <button
-                   type="button"
-                   onClick={() => { setDiscountType(discountType === 'PERCENT' ? 'NONE' : 'PERCENT'); setDiscountValue(10); setIsAutoPrice(true); }}
-                   className={`flex-1 flex items-center justify-center py-2 rounded-lg text-xs font-bold border transition-colors ${discountType === 'PERCENT' ? 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300'}`}
-                 >
-                    <Percent className="w-3 h-3 mr-1" /> %
-                 </button>
-                 <button
-                   type="button"
-                   onClick={() => { setDiscountType(discountType === 'FIXED' ? 'NONE' : 'FIXED'); setDiscountValue(50); setIsAutoPrice(true); }}
-                   className={`flex-1 flex items-center justify-center py-2 rounded-lg text-xs font-bold border transition-colors ${discountType === 'FIXED' ? 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300'}`}
-                 >
-                    <Ticket className="w-3 h-3 mr-1" /> ฿
-                 </button>
-              </div>
-           </div>
-
-           {/* Discount Value Input (Only shows if discount selected) */}
-           {discountType !== 'NONE' && (
-             <div className="col-span-2 animate-in slide-in-from-top-2">
-                 <div className="flex items-center space-x-2 bg-orange-50 dark:bg-orange-900/10 p-2 rounded-lg border border-orange-100 dark:border-orange-900/30">
-                     <span className="text-xs font-bold text-orange-600 uppercase w-16">
-                        {discountType === 'PERCENT' ? 'Percent Off:' : 'Amount Off:'}
-                     </span>
-                     <input 
-                       type="number"
-                       value={discountValue}
-                       onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
-                       className="flex-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm font-bold text-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                     />
-                     <span className="text-xs font-bold text-orange-600">
-                        {discountType === 'PERCENT' ? '%' : '฿'}
-                     </span>
+        {/* Extras: Customer & Discount */}
+        <div className="p-4 bg-slate-800/30 rounded-xl border border-white/5 space-y-4">
+             <div className="flex items-center gap-4">
+                 <div className="flex-1">
+                     <div className="relative">
+                        <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                        <input 
+                            type="text" 
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                            placeholder="Customer Name (Optional)"
+                            className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:border-green-500 outline-none"
+                        />
+                     </div>
+                 </div>
+                 <div className="flex gap-2">
+                     <button type="button" onClick={() => { setDiscountType(discountType === 'PERCENT' ? 'NONE' : 'PERCENT'); setIsAutoPrice(true); }} className={`p-2 rounded-lg border ${discountType === 'PERCENT' ? 'bg-orange-500/20 border-orange-500 text-orange-400' : 'border-slate-700 text-slate-500'}`}><Percent className="w-4 h-4" /></button>
+                     <button type="button" onClick={() => { setDiscountType(discountType === 'FIXED' ? 'NONE' : 'FIXED'); setIsAutoPrice(true); }} className={`p-2 rounded-lg border ${discountType === 'FIXED' ? 'bg-orange-500/20 border-orange-500 text-orange-400' : 'border-slate-700 text-slate-500'}`}><Ticket className="w-4 h-4" /></button>
                  </div>
              </div>
-           )}
-
+             {discountType !== 'NONE' && (
+                 <div className="flex items-center gap-2 animate-fade-in">
+                     <span className="text-xs font-bold text-orange-400">Value:</span>
+                     <input type="number" value={discountValue} onChange={e => setDiscountValue(parseFloat(e.target.value)||0)} className="w-20 bg-slate-900 border border-orange-500/50 rounded px-2 py-1 text-xs text-white outline-none" />
+                 </div>
+             )}
         </div>
 
-        {/* Price & Negotiation */}
-        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-600 animate-in fade-in slide-in-from-left-2 duration-300 delay-100">
-          <div className="flex justify-between items-center mb-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.totalPrice}</label>
+        {/* Price Display */}
+        <div className="bg-black/40 p-5 rounded-2xl border border-white/5 flex items-center justify-between">
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{t.totalPrice}</label>
+                <div className="flex items-end gap-2">
+                    <span className="text-3xl font-black text-green-400 font-mono tracking-tighter">{formatCurrency(price)}</span>
+                    {discountType !== 'NONE' && <span className="text-xs text-orange-400 font-bold mb-1 line-through opacity-60">{formatCurrency(basePrice)}</span>}
+                </div>
+            </div>
             <button
               type="button"
-              onClick={() => {
-                  setIsAutoPrice(!isAutoPrice);
-                  setDiscountType('NONE');
-              }}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center p-1"
+              onClick={() => { setIsAutoPrice(!isAutoPrice); setDiscountType('NONE'); }}
+              className="text-[10px] text-blue-400 hover:text-white underline decoration-dashed underline-offset-4 opacity-60 hover:opacity-100"
             >
-              <Tag className="w-3 h-3 mr-1" />
               {isAutoPrice ? t.manualAdjustment : t.revertAuto}
             </button>
-          </div>
-          <div className="flex items-center relative">
-            <span className="absolute left-3 text-gray-500 dark:text-gray-400 text-lg">฿</span>
-            <input
-              type="number"
-              value={price}
-              readOnly={isAutoPrice}
-              onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
-              className={`w-full pl-8 pr-4 py-3 text-2xl font-bold rounded-lg border focus:ring-2 focus:outline-none transition-all ${
-                isAutoPrice 
-                  ? 'bg-gray-100 dark:bg-gray-600 border-transparent text-gray-500 dark:text-gray-300' 
-                  : 'bg-white dark:bg-gray-800 border-blue-300 dark:border-blue-500 text-blue-600 dark:text-blue-400 focus:ring-blue-500 shadow-inner'
-              }`}
+        </div>
+        
+        {!isAutoPrice && (
+            <input 
+                type="number" 
+                value={price} 
+                onChange={e => setPrice(parseFloat(e.target.value)||0)} 
+                className="w-full bg-slate-900 border border-blue-500/50 text-blue-400 font-bold text-center py-2 rounded-lg outline-none"
             />
-          </div>
-          {discountType !== 'NONE' && (
-            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1 flex items-center font-bold">
-              <Ticket className="w-3 h-3 mr-1" />
-              Discount Applied: -{formatCurrency(basePrice - price)}
-            </p>
-          )}
-          {!isAutoPrice && discountType === 'NONE' && (
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center animate-pulse">
-              <AlertCircle className="w-3 h-3 mr-1" />
-              {t.manualAdjustment}
-            </p>
-          )}
+        )}
+
+        {/* Payment & Submit */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+             <div className="flex bg-slate-900 rounded-xl p-1 border border-white/5">
+                 <button type="button" onClick={() => setPaymentMethod('Cash')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${paymentMethod === 'Cash' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-white'}`}><Banknote className="w-4 h-4" /> {t.cash}</button>
+                 <button type="button" onClick={() => setPaymentMethod('Scan')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${paymentMethod === 'Scan' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-white'}`}><QrCode className="w-4 h-4" /> {t.scan}</button>
+             </div>
+             
+             <button
+                type="submit"
+                disabled={!selectedStrain}
+                className="bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-900/30 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
+             >
+                {t.confirmSale}
+             </button>
         </div>
 
-        {/* Payment Method Selector */}
-        <div className="animate-in fade-in slide-in-from-left-2 duration-300 delay-150">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t.paymentMethod}</label>
-            <div className="grid grid-cols-2 gap-3">
-                <button
-                    type="button"
-                    onClick={() => {
-                        setPaymentMethod('Cash');
-                    }}
-                    className={`flex items-center justify-center p-3 rounded-lg border transition-all ${
-                        paymentMethod === 'Cash'
-                        ? 'bg-green-100 border-green-500 text-green-800 dark:bg-green-900/40 dark:text-green-300 dark:border-green-600 shadow-md transform scale-[1.02]'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
-                    }`}
-                >
-                    <Banknote className="w-5 h-5 mr-2" />
-                    <span className="font-bold">{t.cash}</span>
-                </button>
-                <button
-                    type="button"
-                    onClick={() => {
-                        setPaymentMethod('Scan');
-                    }}
-                    className={`flex items-center justify-center p-3 rounded-lg border transition-all ${
-                        paymentMethod === 'Scan'
-                        ? 'bg-blue-100 border-blue-500 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-600 shadow-md transform scale-[1.02]'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
-                    }`}
-                >
-                    <QrCode className="w-5 h-5 mr-2" />
-                    <span className="font-bold">{t.scan}</span>
-                </button>
-            </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={!selectedStrain}
-          className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:scale-95 touch-manipulation disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed flex items-center justify-center"
-        >
-          {t.confirmSale}
-        </button>
       </form>
     </div>
   );

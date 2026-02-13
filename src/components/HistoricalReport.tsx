@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { InventoryItem, DayReport } from '../types';
 import { formatCurrency } from '../utils/pricing';
@@ -107,8 +106,10 @@ export const HistoricalReport: React.FC<HistoricalReportProps> = ({ archivedRepo
          acc[curr.productType] = (acc[curr.productType] || 0) + curr.price;
          return acc;
      }, {} as Record<string, number>);
-     const total = Object.values(stats).reduce((a, b) => a + b, 0);
-     return Object.entries(stats).map(([type, val]) => ({ type, val, pct: total ? (val / total) * 100 : 0 }));
+     
+     // Explicitly type arguments for reduce to avoid 'unknown' type errors
+     const total = (Object.values(stats) as number[]).reduce((a, b) => a + b, 0);
+     return Object.entries(stats).map(([type, val]) => ({ type, val: Number(val), pct: total ? (Number(val) / total) * 100 : 0 }));
   }, [filteredSales]);
 
   const bestSellers = useMemo(() => {

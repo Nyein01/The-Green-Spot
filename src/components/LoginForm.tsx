@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Leaf, Lock, User, Users, Check, Fingerprint, ScanLine, Globe } from 'lucide-react';
+import { Leaf, Lock, User, ArrowRight, Fingerprint, ScanLine, Globe, ShieldCheck } from 'lucide-react';
 import { translations, Language } from '../utils/translations';
 
 interface LoginFormProps {
@@ -11,33 +11,17 @@ interface LoginFormProps {
 export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLanguage }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const t = translations[language];
-
-  // Load saved credentials on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('gs_creds');
-    if (saved) {
-      try {
-        const { u, p } = JSON.parse(atob(saved));
-        setUsername(u);
-        setPassword(p);
-        setRememberMe(true);
-      } catch (e) {
-        localStorage.removeItem('gs_creds');
-      }
-    }
-  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     
-    // Simulate network/scan delay
+    // Simulate slight network delay for effect
     await new Promise(resolve => setTimeout(resolve, 800));
 
     const user = username.toLowerCase().trim();
@@ -69,152 +53,114 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
         }
     }
 
-    if (success) {
-        if (rememberMe) {
-            localStorage.setItem('gs_creds', btoa(JSON.stringify({ u: username, p: password })));
-        } else {
-            localStorage.removeItem('gs_creds');
-        }
-    } else {
+    if (!success) {
         setError(t.accessDenied);
         setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden bg-[#0f172a]">
-      {/* Rick and Morty Space Background */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center pointer-events-none"
-        style={{
-            backgroundImage: `url('https://wallpaperaccess.com/full/159512.jpg')`,
-            opacity: 0.6
-        }}
-      ></div>
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent"></div>
-
-      <style>{`
-        @keyframes scan {
-            0% { top: 0%; opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { top: 100%; opacity: 0; }
-        }
-        .animate-scan {
-            animation: scan 1.5s ease-in-out infinite;
-        }
-      `}</style>
-
-      {/* Language Switcher Top Right */}
-      <div className="absolute top-6 right-6 z-20">
-          <div className="bg-black/60 backdrop-blur-md rounded-full p-1 flex items-center border border-white/10 shadow-lg">
-              {(['en', 'th', 'mm'] as Language[]).map(lang => (
-                  <button
-                    key={lang}
-                    onClick={() => setLanguage(lang)}
-                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${language === lang ? 'bg-green-600 text-white' : 'text-gray-300 hover:text-white'}`}
-                  >
-                      {lang.toUpperCase()}
-                  </button>
-              ))}
-          </div>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Animated Background Mesh */}
+      <div className="absolute inset-0 z-0">
+          <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-green-500/20 rounded-full blur-[120px] animate-pulse"></div>
+          <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-blue-600/20 rounded-full blur-[120px] animate-pulse delay-1000"></div>
       </div>
 
-      {/* Login Card */}
-      <div className="relative bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border border-white/10 z-10 ring-1 ring-white/5">
+      <div className="relative z-10 w-full max-w-[400px]">
         
-        {/* Scanner Overlay */}
-        {loading && (
-            <div className="absolute inset-0 z-50 pointer-events-none">
-                <div className="absolute left-0 right-0 h-1 bg-green-500 shadow-[0_0_20px_rgba(34,197,94,0.8)] animate-scan"></div>
-                <div className="absolute inset-0 bg-green-500/10"></div>
-            </div>
-        )}
-
-        <div className="p-8 text-center border-b border-white/10 bg-black/40">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-green-500 to-green-700 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-green-900/50">
-              <Leaf className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-white tracking-wide">{t.systemName}</h1>
-            <p className="text-gray-400 text-xs font-medium uppercase tracking-widest mt-1">{t.secureTerminal}</p>
+        {/* Logo/Brand Area */}
+        <div className="text-center mb-8 animate-fade-in">
+           <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-green-500 to-emerald-700 shadow-2xl shadow-green-900/50 mb-6 rotate-3 hover:rotate-6 transition-transform duration-500 border border-green-400/20">
+               <Leaf className="w-10 h-10 text-white" />
+           </div>
+           <h1 className="text-3xl font-black text-white tracking-tight mb-2 drop-shadow-lg">{t.systemName}</h1>
+           <div className="flex items-center justify-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse"></span>
+              <p className="text-green-400/80 text-xs font-bold uppercase tracking-[0.2em]">{t.secureTerminal}</p>
+           </div>
         </div>
-        
-        <div className="p-8 bg-white dark:bg-gray-900/80 backdrop-blur-sm">
-          <form onSubmit={handleLogin} className="space-y-5">
-            {error && (
-              <div className="p-3 rounded-lg bg-red-50 text-red-600 text-xs font-bold border border-red-100 flex items-center animate-shake">
-                <ScanLine className="w-4 h-4 mr-2 flex-shrink-0" /> {error}
-              </div>
-            )}
-            
-            <div className="space-y-4">
-                <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <User className="h-5 w-5 text-gray-400 group-focus-within:text-green-600 transition-colors" />
-                    </div>
-                    <input
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        required
-                        disabled={loading}
-                        className="block w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all disabled:opacity-50 text-sm font-medium"
-                        placeholder={t.username}
-                    />
-                </div>
 
-                <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-green-600 transition-colors" />
+        {/* Glass Card */}
+        <div className="glass-panel rounded-3xl p-1 shadow-2xl animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <div className="bg-slate-900/60 rounded-[20px] p-8 border border-white/5 relative overflow-hidden">
+                
+                {loading && (
+                    <div className="absolute inset-0 bg-black/50 z-20 flex flex-col items-center justify-center backdrop-blur-sm">
+                        <ScanLine className="w-10 h-10 text-green-400 animate-spin-slow mb-3" />
+                        <span className="text-green-400 text-xs font-mono tracking-widest">{t.authenticating}</span>
                     </div>
-                    <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        disabled={loading}
-                        className="block w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all disabled:opacity-50 text-sm font-medium tracking-widest"
-                        placeholder={t.password}
-                    />
-                </div>
-            </div>
+                )}
 
-            <div className="flex items-center justify-between">
-                <label className="flex items-center space-x-2 cursor-pointer group">
-                    <div className="relative">
-                        <input 
-                            type="checkbox" 
-                            checked={rememberMe}
-                            onChange={(e) => setRememberMe(e.target.checked)}
-                            className="sr-only"
-                        />
-                        <div className={`w-4 h-4 border rounded transition-colors flex items-center justify-center ${rememberMe ? 'bg-green-600 border-green-600' : 'border-gray-300 bg-white'}`}>
-                            {rememberMe && <Check className="w-3 h-3 text-white" />}
+                <form onSubmit={handleLogin} className="space-y-6">
+                    <div className="space-y-4">
+                        <div className="group relative">
+                            <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-500 group-focus-within:text-green-400 transition-colors" />
+                            <input 
+                                type="text"
+                                placeholder={t.username}
+                                value={username}
+                                onChange={e => setUsername(e.target.value)}
+                                className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl py-3.5 pl-12 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-green-500/50 focus:ring-1 focus:ring-green-500/50 transition-all"
+                            />
+                        </div>
+                        
+                        <div className="group relative">
+                            <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-500 group-focus-within:text-green-400 transition-colors" />
+                            <input 
+                                type="password"
+                                placeholder={t.password}
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl py-3.5 pl-12 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-green-500/50 focus:ring-1 focus:ring-green-500/50 transition-all tracking-widest"
+                            />
                         </div>
                     </div>
-                    <span className="text-xs text-gray-500 font-medium group-hover:text-green-600 transition-colors">{t.rememberMe}</span>
-                </label>
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className={`w-full relative overflow-hidden flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white transition-all transform hover:-translate-y-0.5 active:scale-95 ${loading ? 'bg-gray-800 cursor-wait' : 'bg-green-600 hover:bg-green-700'}`}
-            >
-              {loading ? (
-                <div className="flex items-center space-x-2">
-                  <Fingerprint className="w-5 h-5 animate-pulse text-green-200" />
-                  <span className="animate-pulse text-green-100">{t.authenticating}</span>
+                    {error && (
+                        <div className="flex items-center gap-2 text-red-400 text-xs bg-red-950/30 p-3 rounded-lg border border-red-900/50">
+                            <ShieldCheck className="w-4 h-4" />
+                            {error}
+                        </div>
+                    )}
+
+                    <button 
+                        type="submit"
+                        disabled={loading}
+                        className="w-full group relative bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-green-900/20 transition-all transform hover:scale-[1.02] active:scale-[0.98] overflow-hidden"
+                    >
+                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                        <div className="relative flex items-center justify-center gap-2">
+                            <span>{t.login}</span>
+                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                    </button>
+                </form>
+
+                <div className="mt-8 flex justify-center gap-2">
+                    {(['en', 'th', 'mm'] as Language[]).map(lang => (
+                        <button
+                            key={lang}
+                            onClick={() => setLanguage(lang)}
+                            className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all border ${
+                                language === lang 
+                                ? 'bg-white/10 text-white border-white/20' 
+                                : 'text-slate-500 border-transparent hover:text-slate-300'
+                            }`}
+                        >
+                            {lang}
+                        </button>
+                    ))}
                 </div>
-              ) : (
-                <div className="flex items-center space-x-2">
-                    <Users className="w-5 h-5" />
-                    <span>{t.login}</span>
-                </div>
-              )}
-            </button>
-          </form>
+            </div>
         </div>
+
+        <div className="mt-8 text-center">
+            <p className="text-slate-600 text-[10px]">
+                Powered by <span className="text-slate-400 font-bold">Cloud POS v3.1</span>
+            </p>
+        </div>
+
       </div>
     </div>
   );
