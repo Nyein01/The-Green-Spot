@@ -263,6 +263,33 @@ export const adjustStockInCloud = async (shopId: string, itemId: string, current
   }
 };
 
+export const clearInventoryInCloud = async (shopId: string, inventoryList: InventoryItem[]) => {
+    if (inventoryList.length === 0) return true;
+    const { inventory } = getCollections(shopId);
+    
+    // Chunk items into batches of 400 to be safe (limit is 500)
+    const chunk_size = 400;
+    const chunks = [];
+    for (let i = 0; i < inventoryList.length; i += chunk_size) {
+        chunks.push(inventoryList.slice(i, i + chunk_size));
+    }
+
+    try {
+        for (const chunk of chunks) {
+            const batch = writeBatch(db);
+            chunk.forEach((item) => {
+                const ref = doc(db, inventory, item.id);
+                batch.delete(ref);
+            });
+            await batch.commit();
+        }
+        return true;
+    } catch (e: any) {
+        console.error("Error clearing inventory: ", e);
+        return false;
+    }
+};
+
 export const clearSalesInCloud = async (shopId: string, salesList: SaleItem[]) => {
   if (salesList.length === 0) return true;
   const { sales } = getCollections(shopId);

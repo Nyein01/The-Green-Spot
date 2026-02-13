@@ -53,6 +53,7 @@ import {
   deleteSaleFromCloud,
   deleteInventoryItemFromCloud,
   clearSalesInCloud,
+  clearInventoryInCloud,
   clearExpensesInCloud,
   migrateLocalToCloud,
   seedDefaultInventory,
@@ -244,7 +245,7 @@ const App: React.FC = () => {
   }
 
   const handleNewSale = async (sale: SaleItem) => {
-    if (!isOnline) return alert("⚠️ You are offline.");
+    if (!isOnline) return addToast("⚠️ You are offline.", 'error');
     const success = await addSaleToCloud(currentShop, sale);
     if (!success) {
         addToast("Error saving sale", 'error');
@@ -258,7 +259,7 @@ const App: React.FC = () => {
   };
 
   const handleAddExpense = async (description: string, amount: number) => {
-    if (!isOnline) return alert("Offline: Cannot add expense.");
+    if (!isOnline) return addToast("Offline: Cannot add expense.", 'error');
     const expense: Expense = {
         id: generateId(),
         description,
@@ -270,14 +271,16 @@ const App: React.FC = () => {
   };
 
   const handleDeleteExpense = async (id: string) => {
-    if (!isOnline) return alert("Offline: Cannot delete expense.");
+    if (!isOnline) return addToast("Offline: Cannot delete expense.", 'error');
     await deleteExpenseFromCloud(currentShop, id);
     addToast("Expense deleted", 'info');
   };
 
   const handleDeleteSale = async (sale: SaleItem) => {
-    if (!isOnline) return alert("⚠️ You are offline. Cannot delete sales.");
+    if (!isOnline) return addToast("⚠️ You are offline. Cannot delete sales.", 'error');
     
+    // Note: We are still using confirm() here for sales deletion as requested to focus on inventory, 
+    // but ideally this should also be replaced with a modal.
     if(!confirm("Are you sure you want to void this transaction? Stock will be restored.")) return;
 
     setDeletingIds(prev => new Set(prev).add(sale.id));
@@ -300,9 +303,21 @@ const App: React.FC = () => {
   };
 
   const handleDeleteInventory = async (id: string) => {
-    if (!isOnline) return alert("Cannot delete items while offline.");
+    if (!isOnline) return addToast("Cannot delete items while offline.", 'error');
+    // Confirmation handled in UI component now
     await deleteInventoryItemFromCloud(currentShop, id);
     addToast("Product deleted", 'info');
+  }
+
+  const handleResetInventory = async () => {
+    if (!isOnline) return addToast("Cannot reset inventory while offline.", 'error');
+    // Confirmation handled in UI component now
+    const success = await clearInventoryInCloud(currentShop, inventory);
+    if (success) {
+        addToast("Inventory cleared", 'success');
+    } else {
+        addToast("Failed to reset inventory", 'error');
+    }
   }
 
   const handleResetDay = async () => {
@@ -312,7 +327,7 @@ const App: React.FC = () => {
   };
 
   const handleRestoreReport = async (report: DayReport) => {
-      if (!isOnline) return alert("Cannot restore while offline.");
+      if (!isOnline) return addToast("Cannot restore while offline.", 'error');
       if (confirm(`Restore ${report.sales.length} sales from ${new Date(report.date).toLocaleDateString()} to the live register?`)) {
           const success = await restoreSalesBatch(currentShop, report.sales);
           if (success) {
@@ -326,7 +341,7 @@ const App: React.FC = () => {
 
   const handleDeleteReport = async (reportId: string) => {
       if (!isOnline) {
-          alert("Cannot delete while offline.");
+          addToast("Cannot delete while offline.", 'error');
           return;
       }
       const success = await deleteReportFromCloud(currentShop, reportId);
@@ -536,7 +551,21 @@ const App: React.FC = () => {
           </div>
         );
       case Tab.INVENTORY:
-        return <div className={contentClass}><InventoryManager inventory={inventory} onUpdateInventory={(item) => updateInventoryInCloud(currentShop, item)} onAdjustStock={(id, adj) => { const item = inventory.find(i => i.id === id); if(item) adjustStockInCloud(currentShop, id, item.stockLevel, adj); }} onDeleteInventory={handleDeleteInventory} shopName={shopNames[currentShop]} isSuperAdmin={isSuperAdmin} language={language} onBroadcastLowStock={handleBroadcastLowStock} /></div>;
+        return (
+            <div className={contentClass}>
+                <InventoryManager 
+                    inventory={inventory} 
+                    onUpdateInventory={(item) => updateInventoryInCloud(currentShop, item)} 
+                    onAdjustStock={(id, adj) => { const item = inventory.find(i => i.id === id); if(item) adjustStockInCloud(currentShop, id, item.stockLevel, adj); }} 
+                    onDeleteInventory={handleDeleteInventory}
+                    onResetInventory={handleResetInventory}
+                    shopName={shopNames[currentShop]} 
+                    isSuperAdmin={isSuperAdmin} 
+                    language={language} 
+                    onBroadcastLowStock={handleBroadcastLowStock} 
+                />
+            </div>
+        );
       case Tab.CUSTOMERS:
         return <div className={contentClass}><CustomerView sales={[...sales, ...reports.flatMap(r => r.sales)]} /></div>;
       case Tab.REPORT:
@@ -711,28 +740,31 @@ const App: React.FC = () => {
         }
       `}</style>
       <div className="h-screen w-full bg-transparent flex flex-col md:flex-row overflow-hidden transition-colors duration-300">
-        <div className="md:hidden bg-white/70 dark:bg-slate-900/70 backdrop-blur-md p-4 shadow-sm flex justify-between items-center z-40 border-b border-gray-200/50 dark:border-gray-700/50 text-slate-800 dark:text-white">
-          <div className="flex items-center"><Leaf className="w-6 h-6 text-green-600 mr-2" /><span className="font-bold text-lg">{shopNames[currentShop]}</span></div>
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2">{isMobileMenuOpen ? <X /> : <Menu />}</button>
+        
+        {/* Mobile Header - FORCED DARK GLASS UI */}
+        <div className="md:hidden bg-slate-900/90 backdrop-blur-md p-4 shadow-sm flex justify-between items-center z-40 border-b border-white/10 text-white">
+          <div className="flex items-center"><Leaf className="w-6 h-6 text-green-500 mr-2" /><span className="font-bold text-lg">{shopNames[currentShop]}</span></div>
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-white/80 hover:text-white">{isMobileMenuOpen ? <X /> : <Menu />}</button>
         </div>
 
-        <nav className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform w-72 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-2xl z-50 flex flex-col justify-between border-r border-gray-200/50 dark:border-gray-700/50 overflow-y-auto duration-300 ease-in-out`}>
+        {/* Sidebar - FORCED DARK GLASS UI */}
+        <nav className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform w-72 bg-slate-900/90 backdrop-blur-xl shadow-2xl z-50 flex flex-col justify-between border-r border-white/10 overflow-y-auto duration-300 ease-in-out`}>
           <div>
             <div className="p-6 hidden md:block">
               <div className="flex items-center mb-1 group">
-                  <Leaf className="w-8 h-8 text-green-600 mr-2 group-hover:rotate-12 transition-transform duration-300" />
-                  <h1 className="text-2xl font-black text-green-600 tracking-tight">{shopNames[currentShop]}</h1>
+                  <Leaf className="w-8 h-8 text-green-500 mr-2 group-hover:rotate-12 transition-transform duration-300" />
+                  <h1 className="text-2xl font-black text-green-500 tracking-tight">{shopNames[currentShop]}</h1>
               </div>
-              <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold pl-1">Cloud POS v3.1</p>
-              <div className="mt-4 flex items-center px-3 py-2 bg-gray-50/50 dark:bg-gray-700/30 rounded-lg border border-gray-100/50 dark:border-gray-700/50">
-                 <UserCircle2 className="w-5 h-5 text-gray-400 mr-2" />
+              <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold pl-1">Cloud POS v3.1</p>
+              <div className="mt-4 flex items-center px-3 py-2 bg-slate-800/50 rounded-lg border border-white/5">
+                 <UserCircle2 className="w-5 h-5 text-slate-400 mr-2" />
                  <div>
-                    <p className="text-[10px] text-gray-400 uppercase font-bold">Logged in as</p>
-                    <p className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate max-w-[140px]">{currentStaff}</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-bold">Logged in as</p>
+                    <p className="text-xs font-bold text-slate-200 truncate max-w-[140px]">{currentStaff}</p>
                  </div>
               </div>
             </div>
-            {isSuperAdmin && <div className="px-4 mb-4"><select value={currentShop} onChange={(e) => setCurrentShop(e.target.value as ShopId)} className="w-full p-2.5 rounded-lg text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white"><option value="greenspot">The Green Spot</option><option value="nearcannabis">Near Cannabis</option></select></div>}
+            {isSuperAdmin && <div className="px-4 mb-4"><select value={currentShop} onChange={(e) => setCurrentShop(e.target.value as ShopId)} className="w-full p-2.5 rounded-lg text-sm bg-slate-800 border border-slate-600 text-white"><option value="greenspot">The Green Spot</option><option value="nearcannabis">Near Cannabis</option></select></div>}
             
             <div className="px-4 space-y-1 mt-4">
               {[
@@ -742,19 +774,19 @@ const App: React.FC = () => {
                 { t: Tab.REPORT, l: t.report, i: <FileText className="w-5 h-5 mr-3" /> },
                 { t: Tab.ARCHIVE, l: t.archive, i: <Archive className="w-5 h-5 mr-3" /> },
               ].map(item => (
-                <button key={item.t} onClick={() => { setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none font-bold scale-105' : 'text-gray-500 hover:bg-gray-50/50 dark:hover:bg-gray-700/50'}`}>{item.i}{item.l}</button>
+                <button key={item.t} onClick={() => { setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-green-600 text-white shadow-lg shadow-green-900/50 font-bold scale-105' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>{item.i}{item.l}</button>
               ))}
-              <div className="pt-4 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{t.dashboard}</div>
+              <div className="pt-4 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{t.dashboard}</div>
               {[
                 { t: Tab.SETTINGS, l: t.settings, i: <Cloud className="w-5 h-5 mr-3" /> },
               ].map(item => (
-                <button key={item.t} onClick={() => { setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-indigo-600 text-white font-bold scale-105' : 'text-gray-500 hover:bg-gray-50/50 dark:hover:bg-gray-700/50'}`}>{item.i}{item.l}</button>
+                <button key={item.t} onClick={() => { setActiveTab(item.t); setIsMobileMenuOpen(false); }} className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 ${activeTab === item.t ? 'bg-indigo-600 text-white font-bold scale-105' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>{item.i}{item.l}</button>
               ))}
             </div>
           </div>
-          <div className="p-4 border-t border-gray-200/50 dark:border-gray-700/50 space-y-3">
-            <button onClick={handleLogout} className="w-full flex items-center justify-center p-2 rounded-lg bg-red-50 text-red-600 font-bold text-sm hover:bg-red-100 transition-colors"><LogOut className="w-4 h-4 mr-2" /> {t.logout}</button>
-            <div className="bg-green-900 rounded-xl p-4 text-white text-center shadow-lg transform transition-transform hover:scale-105"><p className="text-[10px] font-bold uppercase opacity-60 mb-1">{t.dailyTotal}</p><p className="text-2xl font-black">{sales.reduce((a, b) => a + b.price, 0).toLocaleString()} ฿</p></div>
+          <div className="p-4 border-t border-white/5 space-y-3">
+            <button onClick={handleLogout} className="w-full flex items-center justify-center p-2 rounded-lg bg-red-500/10 text-red-400 font-bold text-sm hover:bg-red-500/20 transition-colors"><LogOut className="w-4 h-4 mr-2" /> {t.logout}</button>
+            <div className="bg-black/50 rounded-xl p-4 text-white text-center shadow-lg transform transition-transform hover:scale-105 border border-white/5"><p className="text-[10px] font-bold uppercase opacity-60 mb-1">{t.dailyTotal}</p><p className="text-2xl font-black">{sales.reduce((a, b) => a + b.price, 0).toLocaleString()} ฿</p></div>
           </div>
         </nav>
         <main className="flex-1 overflow-y-auto p-4 md:p-8 relative transition-colors duration-300">{renderContent()}</main>
