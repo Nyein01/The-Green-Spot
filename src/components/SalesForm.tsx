@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProductType, FlowerGrade, InventoryItem, SaleItem } from '../types';
 import { calculateFlowerPrice, formatCurrency, generateId } from '../utils/pricing';
-import { ShoppingCart, Tag, AlertCircle, Search, X, ChevronDown, Check, Banknote, QrCode, Percent, User, Ticket, Plus, Trash2, ListChecks } from 'lucide-react';
+import { ShoppingCart, Search, X, Check, Banknote, QrCode, User, Plus, Trash2, ListChecks, Flower2, Cigarette, Cookie, Flame, Package } from 'lucide-react';
 import { translations, Language } from '../utils/translations';
 
 interface SalesFormProps {
@@ -30,10 +30,6 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
   // Transaction Global Settings
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Scan'>('Cash');
   const [customerName, setCustomerName] = useState<string>('');
-  
-  // Item Specific Settings
-  const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'FIXED'>('NONE');
-  const [discountValue, setDiscountValue] = useState<number>(0);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const t = translations[language];
@@ -71,18 +67,11 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
     setBasePrice(calculated);
   }, [productType, selectedStrain, grade, quantity, inventory]);
 
-  // Discount/Auto-Price Logic
+  // Auto-Price Logic (Discount logic removed)
   useEffect(() => {
     if (!isAutoPrice) return;
-    let final = basePrice;
-    if (discountType === 'PERCENT') {
-        const amountOff = basePrice * (discountValue / 100);
-        final = basePrice - amountOff;
-    } else if (discountType === 'FIXED') {
-        final = Math.max(0, basePrice - discountValue);
-    }
-    setPrice(final);
-  }, [basePrice, discountType, discountValue, isAutoPrice]);
+    setPrice(basePrice);
+  }, [basePrice, isAutoPrice]);
 
   const handleAddToCart = (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +90,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
       isNegotiated: !isAutoPrice,
       staffName: staffName,
       paymentMethod: paymentMethod, // Placeholder, will be overwritten at checkout
-      discount: basePrice - Number(price),
+      discount: 0,
       customerName: customerName // Placeholder
     };
 
@@ -113,8 +102,6 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
     setSearchQuery('');
     setSelectedStrain('');
     setIsDropdownOpen(false);
-    setDiscountType('NONE');
-    setDiscountValue(0);
   };
 
   const handleRemoveFromCart = (id: string) => {
@@ -152,13 +139,23 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
       setSearchQuery('');
       setIsAutoPrice(true);
       setIsDropdownOpen(false);
-      setDiscountType('NONE');
   }
 
   const handleSelectItem = (item: InventoryItem) => {
     setSelectedStrain(item.name);
     setSearchQuery(item.name);
     setIsDropdownOpen(false);
+  };
+
+  const getProductIcon = (type: ProductType) => {
+    switch (type) {
+      case ProductType.FLOWER: return <Flower2 className="w-4 h-4" />;
+      case ProductType.PRE_ROLL: return <Cigarette className="w-4 h-4" />;
+      case ProductType.EDIBLE: return <Cookie className="w-4 h-4" />;
+      case ProductType.ACCESSORY: return <Flame className="w-4 h-4" />;
+      case ProductType.OTHER: return <Package className="w-4 h-4" />;
+      default: return <Package className="w-4 h-4" />;
+    }
   };
 
   const visibleTypes = Object.values(ProductType).filter(t => t !== ProductType.OTHER);
@@ -182,12 +179,13 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                   key={type}
                   type="button"
                   onClick={() => handleTypeChange(type)}
-                  className={`flex-1 min-w-[80px] py-2 px-3 text-xs font-bold rounded-lg transition-all duration-300 ${
+                  className={`flex-1 min-w-[100px] py-3 px-3 text-xs font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
                     productType === type
                       ? 'bg-gradient-to-br from-green-500 to-emerald-700 text-white shadow-lg shadow-green-900/40'
                       : 'text-slate-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
+                  {getProductIcon(type)}
                   {type}
                 </button>
               ))}
@@ -257,7 +255,7 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                         <button
                           key={g}
                           type="button"
-                          onClick={() => { setGrade(g); setIsAutoPrice(true); setDiscountType('NONE'); }}
+                          onClick={() => { setGrade(g); setIsAutoPrice(true); }}
                           className={`py-2 px-1 text-[10px] font-bold uppercase rounded-lg border transition-all ${
                             grade === g
                               ? 'bg-green-500/20 border-green-500 text-green-400'
@@ -289,60 +287,17 @@ export const SalesForm: React.FC<SalesFormProps> = ({ inventory, onSaleComplete,
                 </div>
             </div>
 
-            {/* Discounts */}
-            <div className="p-4 bg-slate-800/30 rounded-xl border border-white/5 space-y-4">
-                <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 uppercase">Item Discount</span>
-                    <div className="flex gap-2">
-                        <button type="button" onClick={() => { setDiscountType(discountType === 'PERCENT' ? 'NONE' : 'PERCENT'); setIsAutoPrice(true); }} className={`p-2 rounded-lg border ${discountType === 'PERCENT' ? 'bg-orange-500/20 border-orange-500 text-orange-400' : 'border-slate-700 text-slate-500'}`}><Percent className="w-4 h-4" /></button>
-                        <button type="button" onClick={() => { setDiscountType(discountType === 'FIXED' ? 'NONE' : 'FIXED'); setIsAutoPrice(true); }} className={`p-2 rounded-lg border ${discountType === 'FIXED' ? 'bg-orange-500/20 border-orange-500 text-orange-400' : 'border-slate-700 text-slate-500'}`}><Ticket className="w-4 h-4" /></button>
-                    </div>
-                </div>
-                {discountType !== 'NONE' && (
-                    <div className="flex items-center gap-2 animate-fade-in">
-                        <span className="text-xs font-bold text-orange-400">Value:</span>
-                        <input type="number" value={discountValue} onChange={e => setDiscountValue(parseFloat(e.target.value)||0)} className="w-20 bg-slate-900 border border-orange-500/50 rounded px-2 py-1 text-xs text-white outline-none" />
-                    </div>
-                )}
-                
-                {/* Quick Presets */}
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5">
-                   <button 
-                     type="button" 
-                     onClick={() => { setDiscountType('PERCENT'); setDiscountValue(5); setIsAutoPrice(true); }}
-                     className="px-2 py-1 rounded bg-slate-900 border border-slate-700 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800"
-                   >
-                     5% Off
-                   </button>
-                   <button 
-                     type="button" 
-                     onClick={() => { setDiscountType('PERCENT'); setDiscountValue(10); setIsAutoPrice(true); }}
-                     className="px-2 py-1 rounded bg-slate-900 border border-slate-700 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800"
-                   >
-                     10% Off
-                   </button>
-                   <button 
-                     type="button" 
-                     onClick={() => { setDiscountType('PERCENT'); setDiscountValue(20); setIsAutoPrice(true); }}
-                     className="px-2 py-1 rounded bg-slate-900 border border-slate-700 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800"
-                   >
-                     Staff
-                   </button>
-                </div>
-            </div>
-
             {/* Price Display */}
             <div className="bg-black/40 p-5 rounded-2xl border border-white/5 flex items-center justify-between">
                 <div>
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{t.totalPrice}</label>
                     <div className="flex items-end gap-2">
                         <span className="text-3xl font-black text-green-400 font-mono tracking-tighter">{formatCurrency(price)}</span>
-                        {discountType !== 'NONE' && <span className="text-xs text-orange-400 font-bold mb-1 line-through opacity-60">{formatCurrency(basePrice)}</span>}
                     </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => { setIsAutoPrice(!isAutoPrice); setDiscountType('NONE'); }}
+                  onClick={() => { setIsAutoPrice(!isAutoPrice); }}
                   className="text-[10px] text-blue-400 hover:text-white underline decoration-dashed underline-offset-4 opacity-60 hover:opacity-100"
                 >
                   {isAutoPrice ? t.manualAdjustment : t.revertAuto}

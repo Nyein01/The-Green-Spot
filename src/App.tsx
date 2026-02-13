@@ -37,7 +37,6 @@ import { SalesForm } from './components/SalesForm';
 import { InventoryManager } from './components/InventoryManager';
 import { DailyReport } from './components/DailyReport';
 import { ArchiveView } from './components/ArchiveView';
-import { CustomerView } from './components/CustomerView';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { 
   subscribeToSales, 
@@ -566,8 +565,6 @@ const App: React.FC = () => {
                 />
             </div>
         );
-      case Tab.CUSTOMERS:
-        return <div className={contentClass}><CustomerView sales={[...sales, ...reports.flatMap(r => r.sales)]} /></div>;
       case Tab.REPORT:
         return <div className={contentClass}><DailyReport sales={sales} expenses={expenses} inventory={inventory} onDeleteSale={handleDeleteSale} onAddExpense={handleAddExpense} onDeleteExpense={handleDeleteExpense} onReset={handleResetDay} deletingIds={deletingIds} shopName={shopNames[currentShop]} staffName={currentStaff} /></div>;
       case Tab.ARCHIVE:
@@ -770,7 +767,6 @@ const App: React.FC = () => {
               {[
                 { t: Tab.SALES, l: t.sales, i: <PlusCircle className="w-5 h-5 mr-3" /> },
                 { t: Tab.INVENTORY, l: t.inventory, i: <Package className="w-5 h-5 mr-3" /> },
-                { t: Tab.CUSTOMERS, l: t.customers, i: <Users className="w-5 h-5 mr-3" /> },
                 { t: Tab.REPORT, l: t.report, i: <FileText className="w-5 h-5 mr-3" /> },
                 { t: Tab.ARCHIVE, l: t.archive, i: <Archive className="w-5 h-5 mr-3" /> },
               ].map(item => (

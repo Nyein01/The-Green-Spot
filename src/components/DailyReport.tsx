@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { SaleItem, InventoryItem, DayReport, Expense } from '../types';
 import { formatCurrency, generateId } from '../utils/pricing';
 import { saveDayReportToCloud } from '../services/storageService';
-import { Download, TrendingUp, Save, LogOut, Coins, Wallet, Plus, Trash2, Banknote, QrCode, Leaf, Loader2 } from 'lucide-react';
+import { generateSalesAnalysis } from '../services/geminiService';
+import { Download, TrendingUp, Save, LogOut, Wallet, Plus, Trash2, QrCode, Wand2, AlertTriangle, RefreshCw, Loader2, Leaf, Calendar } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -20,15 +21,30 @@ interface DailyReportProps {
 }
 
 export const DailyReport: React.FC<DailyReportProps> = ({ 
-  sales, expenses, onDeleteSale, onAddExpense, onDeleteExpense, onReset, deletingIds, shopName, staffName
+  sales, expenses, inventory, onDeleteSale, onAddExpense, onDeleteExpense, onReset, deletingIds, shopName, staffName
 }) => {
   const [savingReport, setSavingReport] = useState(false);
   const [expDesc, setExpDesc] = useState('');
   const [expAmount, setExpAmount] = useState('');
+  
+  // AI State
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [loadingAi, setLoadingAi] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.price, 0);
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+  const netIncome = totalRevenue - totalExpenses;
+  const totalItems = sales.length;
   
+  const handleGenerateInsight = async () => {
+    setLoadingAi(true);
+    const result = await generateSalesAnalysis(sales, inventory);
+    setAiAnalysis(result);
+    setLoadingAi(false);
+  };
+
   const handleSaveAndArchive = async () => {
     setSavingReport(true);
     let shopId = shopName.toLowerCase().includes('near') ? 'nearcannabis' : 'greenspot';
@@ -56,45 +72,111 @@ export const DailyReport: React.FC<DailyReportProps> = ({
     setExpAmount('');
   };
 
+  const handleDownloadPDF = async () => {
+    const element = document.getElementById('receipt-container');
+    if (!element) return;
+
+    setDownloadingPdf(true);
+
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false,
+        useCORS: true,
+        onclone: (clonedDoc) => {
+          const scrollableDiv = clonedDoc.querySelector('.receipt-scroll') as HTMLElement;
+          if (scrollableDiv) {
+            scrollableDiv.style.maxHeight = 'none';
+            scrollableDiv.style.overflow = 'visible';
+          }
+        }
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      pdf.save(`DailySales_${new Date().toISOString().split('T')[0]}.pdf`);
+
+    } catch (error) {
+      console.error("PDF Generation failed", error);
+      alert("Failed to generate PDF");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in max-w-6xl mx-auto">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in max-w-6xl mx-auto pb-20">
       
       {/* Left Column: Visual Receipt */}
       <div className="glass-panel p-6 rounded-2xl relative">
-          <div className="bg-white text-slate-900 p-6 rounded-lg shadow-xl font-mono text-sm relative overflow-hidden">
+          <div id="receipt-container" className="bg-white text-slate-900 p-6 rounded-lg shadow-xl font-mono text-sm relative overflow-hidden">
              {/* Receipt decoration */}
              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-green-500 via-green-400 to-green-500"></div>
              
              <div className="text-center mb-6">
                  <h2 className="text-2xl font-black uppercase tracking-widest">{shopName}</h2>
                  <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">{new Date().toLocaleDateString()}</p>
+                 <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Daily Sales Report</p>
              </div>
 
              <div className="border-b-2 border-dashed border-slate-200 pb-2 mb-2 flex justify-between text-xs font-bold text-slate-400 uppercase">
-                 <span>Item</span>
+                 <span>Item / Date</span>
                  <span>Amt</span>
              </div>
 
-             <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar-light pr-2">
+             <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar-light pr-2 receipt-scroll">
                  {sales.map((sale, i) => (
-                     <div key={sale.id} className="flex justify-between items-start group">
+                     <div key={sale.id} className="flex justify-between items-start group hover:bg-slate-50 p-1 rounded transition-colors">
                          <div className="flex-1">
-                             <div className="font-bold flex items-center">
+                             <div className="font-bold flex items-center text-slate-800">
+                                 <span className="text-slate-400 mr-2 text-[10px] w-4">{i + 1}.</span>
                                  {sale.productName}
                                  {sale.paymentMethod === 'Scan' && <QrCode className="w-3 h-3 ml-1 text-blue-500" />}
                              </div>
-                             <div className="text-xs text-slate-500">{sale.quantity}{sale.productType === 'Flower'?'g':'u'} {sale.discount ? `(-${sale.discount})` : ''}</div>
+                             <div className="text-xs text-slate-500 ml-6 flex flex-wrap items-center gap-2">
+                                <span>{sale.quantity}{sale.productType === 'Flower'?'g':'u'} {sale.discount ? `(-${sale.discount})` : ''}</span>
+                                <span className="text-slate-300">|</span>
+                                <span className="flex items-center text-slate-400 text-[10px]">
+                                    <Calendar className="w-3 h-3 mr-1" />
+                                    {sale.date || new Date(sale.timestamp).toLocaleDateString()}
+                                </span>
+                             </div>
                          </div>
                          <div className="flex items-center gap-2">
-                            <span className="font-bold">{formatCurrency(sale.price)}</span>
-                            <button onClick={() => onDeleteSale(sale)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-1 rounded"><Trash2 className="w-3 h-3"/></button>
+                            <span className="font-bold text-slate-900">{formatCurrency(sale.price)}</span>
+                            <button onClick={() => onDeleteSale(sale)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-1 rounded" data-html2canvas-ignore><Trash2 className="w-3 h-3"/></button>
                          </div>
                      </div>
                  ))}
              </div>
 
              <div className="mt-6 pt-4 border-t-2 border-dashed border-slate-200">
-                 <div className="flex justify-between items-center text-lg font-black">
+                 <div className="flex justify-between items-center text-lg font-black text-slate-800">
                      <span>TOTAL</span>
                      <span>{formatCurrency(totalRevenue)}</span>
                  </div>
@@ -104,12 +186,32 @@ export const DailyReport: React.FC<DailyReportProps> = ({
                         <span>-{formatCurrency(totalExpenses)}</span>
                      </div>
                  )}
+                 <div className="flex justify-between items-center text-sm font-bold text-green-600 mt-2 border-t border-slate-100 pt-2">
+                    <span>NET INCOME</span>
+                    <span>{formatCurrency(netIncome)}</span>
+                 </div>
              </div>
 
              <div className="mt-8 text-center text-[10px] text-slate-400 uppercase tracking-widest">
-                 Thank you for visiting
+                 Generated by {staffName}
              </div>
           </div>
+          
+           {/* Download Button Overlaid */}
+           <div className="absolute top-8 right-8">
+               <button 
+                  onClick={handleDownloadPDF}
+                  disabled={downloadingPdf}
+                  className={`group flex items-center justify-center w-10 h-10 bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-green-200 rounded-full text-gray-500 hover:text-green-600 transition-all duration-200 ${downloadingPdf ? 'opacity-50 cursor-wait' : ''}`}
+                  title="Download Professional PDF Report"
+               >
+                  {downloadingPdf ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-green-600" />
+                  ) : (
+                    <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  )}
+               </button>
+           </div>
       </div>
 
       {/* Right Column: Controls */}
@@ -125,6 +227,43 @@ export const DailyReport: React.FC<DailyReportProps> = ({
                   <p className="text-xs text-slate-400 uppercase font-bold">Transactions</p>
                   <p className="text-2xl font-black text-white">{sales.length}</p>
               </div>
+          </div>
+          
+          {/* AI Insight Card */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-indigo-100 dark:border-indigo-900/50 overflow-hidden relative group transition-colors">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 dark:bg-indigo-900/20 rounded-bl-full -mr-8 -mt-8 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
+            
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
+                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg mr-3 text-indigo-600 dark:text-indigo-400">
+                  <Wand2 className="w-5 h-5" />
+                </div>
+                AI Insights
+              </h3>
+              <button
+                onClick={handleGenerateInsight}
+                disabled={loadingAi || sales.length === 0}
+                className={`text-xs px-4 py-2 rounded-full font-semibold transition-all shadow-sm ${
+                  loadingAi 
+                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-indigo-200 hover:shadow-lg active:scale-95'
+                }`}
+              >
+                {loadingAi ? 'Analyzing...' : 'Generate Analysis'}
+              </button>
+            </div>
+            
+            <div className="relative z-10 min-h-[60px]">
+              {aiAnalysis ? (
+                <div className="prose prose-sm prose-indigo dark:prose-invert text-gray-600 dark:text-gray-300 bg-indigo-50/50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/30 animate-fade-in-up">
+                  <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">{aiAnalysis}</pre>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-400 text-xs">
+                  <p>Generate smart insights about today's sales performance.</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Expenses */}
@@ -159,11 +298,23 @@ export const DailyReport: React.FC<DailyReportProps> = ({
                   Save Day
               </button>
               <button 
-                onClick={onReset}
-                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 p-4 rounded-xl font-bold flex flex-col items-center justify-center gap-2 transition-all border border-red-500/20"
+                onClick={() => {
+                  if (confirmReset) {
+                      onReset();
+                      setConfirmReset(false);
+                  } else {
+                      setConfirmReset(true);
+                      setTimeout(() => setConfirmReset(false), 3000);
+                  }
+                }}
+                className={`p-4 rounded-xl font-bold flex flex-col items-center justify-center gap-2 transition-all border ${
+                   confirmReset 
+                   ? 'bg-red-600 text-white border-red-500' 
+                   : 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20'
+                }`}
               >
-                  <LogOut />
-                  Close Shift
+                  {confirmReset ? <RefreshCw className="animate-spin"/> : <LogOut />}
+                  {confirmReset ? 'Confirm Close?' : 'Close Shift'}
               </button>
           </div>
       </div>
