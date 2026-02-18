@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Leaf, Lock, User, ArrowRight, ScanLine, ShieldCheck, Store, MapPin, CheckCircle2, ShoppingBag } from 'lucide-react';
 import { translations, Language } from '../utils/translations';
 
@@ -11,11 +11,33 @@ interface LoginFormProps {
 export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLanguage }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showShopSelection, setShowShopSelection] = useState(false);
 
   const t = translations[language];
+
+  // Load saved credentials on mount
+  useEffect(() => {
+    const savedUser = localStorage.getItem('gs_remember_user');
+    const savedPass = localStorage.getItem('gs_remember_pass');
+    if (savedUser && savedPass) {
+        setUsername(savedUser);
+        setPassword(savedPass);
+        setRememberMe(true);
+    }
+  }, []);
+
+  const handleCredentialsStorage = () => {
+    if (rememberMe) {
+        localStorage.setItem('gs_remember_user', username);
+        localStorage.setItem('gs_remember_pass', password);
+    } else {
+        localStorage.removeItem('gs_remember_user');
+        localStorage.removeItem('gs_remember_pass');
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,15 +54,19 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
     // Staff & Shop Logins (Password: 1234)
     if (pass === '1234') {
         if (user === 'nyein') {
+            handleCredentialsStorage();
             onLogin('greenspot', false, 'Staff 1 (Nyein)');
             success = true;
         } else if (user === 'kevin') {
+            handleCredentialsStorage();
             onLogin('greenspot', false, 'Staff 2 (Kevin)');
             success = true;
         } else if (user === 'nearcannabis' || user === 'nearcanabis') {
+            handleCredentialsStorage();
             onLogin('nearcannabis', false, 'Staff (Near Cannabis)');
             success = true;
         } else if (user === 'smallshop') {
+            handleCredentialsStorage();
             onLogin('smallshop', false, 'Staff (Small Shop)');
             success = true;
         }
@@ -49,10 +75,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
     // Manager & Admin Logins (Password: 0000)
     if (pass === '0000') { 
         if (user === 'greenspot') {
+            handleCredentialsStorage();
             onLogin('greenspot', false, 'Manager');
             success = true;
         } else if (user === 'admin') {
             // Intercept Admin Login to force Shop Selection
+            handleCredentialsStorage();
             setShowShopSelection(true);
             setLoading(false);
             return;
@@ -197,6 +225,20 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, language, setLang
                                 onChange={e => setPassword(e.target.value)}
                                 className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl py-3.5 pl-12 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-green-500/50 focus:ring-1 focus:ring-green-500/50 transition-all tracking-widest"
                             />
+                        </div>
+
+                        {/* Remember Me Checkbox */}
+                        <div className="flex items-center gap-2 px-1">
+                            <input
+                                type="checkbox"
+                                id="remember"
+                                checked={rememberMe}
+                                onChange={(e) => setRememberMe(e.target.checked)}
+                                className="w-4 h-4 rounded border-slate-600 bg-slate-900/50 text-green-500 focus:ring-green-500/50 accent-green-500 cursor-pointer"
+                            />
+                            <label htmlFor="remember" className="text-xs text-slate-400 cursor-pointer select-none hover:text-slate-300">
+                                {t.rememberMe}
+                            </label>
                         </div>
                     </div>
 
