@@ -4,7 +4,6 @@ import { formatCurrency, generateId } from '../utils/pricing';
 import { saveDayReportToCloud } from '../services/storageService';
 import { Download, TrendingUp, Save, LogOut, Wallet, Plus, Trash2, QrCode, AlertTriangle, RefreshCw, Loader2, Leaf, Calendar, X } from 'lucide-react';
 import { jsPDF } from "jspdf";
-import { CashDrawer } from './CashDrawer';
 
 interface DailyReportProps {
   sales: SaleItem[];
@@ -475,48 +474,115 @@ export const DailyReport: React.FC<DailyReportProps> = ({
           
           {/* Quick Stats */}
           <div className="grid grid-cols-2 gap-4">
-              <div className="glass-card p-4 rounded-xl">
-                  <p className="text-xs text-slate-400 uppercase font-bold">Net Sales</p>
+              <div className="glass-card p-4 rounded-xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                      <TrendingUp className="w-12 h-12 text-green-400" />
+                  </div>
+                  <p className="text-xs text-slate-400 uppercase font-bold">Total Revenue</p>
                   <p className="text-2xl font-black text-green-400">{formatCurrency(totalRevenue)}</p>
               </div>
-              <div className="glass-card p-4 rounded-xl">
-                  <p className="text-xs text-slate-400 uppercase font-bold">Transactions</p>
-                  <p className="text-2xl font-black text-white">{sales.length}</p>
+              
+              <div className="glass-card p-4 rounded-xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                      <Wallet className="w-12 h-12 text-red-400" />
+                  </div>
+                  <p className="text-xs text-slate-400 uppercase font-bold">Total Expenses</p>
+                  <p className="text-2xl font-black text-red-400">-{formatCurrency(totalExpenses)}</p>
+              </div>
+
+              <div className="glass-card p-4 rounded-xl relative overflow-hidden group col-span-2 bg-gradient-to-r from-slate-800 to-slate-900 border-blue-500/20">
+                  <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                      <Leaf className="w-16 h-16 text-blue-400" />
+                  </div>
+                  <div className="flex justify-between items-end">
+                      <div>
+                          <p className="text-xs text-blue-400 uppercase font-bold mb-1">Net Income</p>
+                          <p className="text-4xl font-black text-white tracking-tight">{formatCurrency(netIncome)}</p>
+                      </div>
+                      <div className="text-right">
+                          <p className="text-xs text-slate-500 uppercase font-bold mb-1">Transactions</p>
+                          <p className="text-xl font-bold text-slate-300">{sales.length}</p>
+                      </div>
+                  </div>
               </div>
           </div>
 
-          {/* Cash Drawer Calculator */}
-          <CashDrawer expectedCash={expectedCash} />
-          
-          {/* Expenses */}
-          <div className="glass-panel p-5 rounded-2xl">
-              <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-white flex items-center"><Wallet className="w-4 h-4 mr-2 text-orange-400"/> Expenses</h3>
+          {/* Expenses Management */}
+          <div className="glass-panel p-5 rounded-2xl border border-white/10">
+              <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-white flex items-center gap-2">
+                      <div className="p-1.5 bg-orange-500/20 rounded-lg">
+                          <Wallet className="w-4 h-4 text-orange-400"/>
+                      </div>
+                      Expense Tracker
+                  </h3>
                   {expenses.length > 0 && (
                       <button 
                           onClick={handleDownloadExpensesPDF}
-                          className="text-xs bg-white/10 hover:bg-white/20 text-white p-1.5 rounded-lg transition-colors flex items-center gap-1"
+                          className="text-xs bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 border border-white/5"
                           title="Download Expense Report"
                       >
-                          <Download className="w-3 h-3" /> PDF
+                          <Download className="w-3 h-3" /> Export PDF
                       </button>
                   )}
               </div>
-              <form onSubmit={handleNewExpense} className="flex gap-2 mb-3">
-                  <input type="text" placeholder="Desc" value={expDesc} onChange={e=>setExpDesc(e.target.value)} className="flex-1 bg-slate-900/50 border border-slate-700 rounded-lg p-2 text-xs text-white" />
-                  <input type="number" placeholder="Amt" value={expAmount} onChange={e=>setExpAmount(e.target.value)} className="w-20 bg-slate-900/50 border border-slate-700 rounded-lg p-2 text-xs text-white" />
-                  <button type="submit" className="bg-orange-500 text-white p-2 rounded-lg hover:bg-orange-600"><Plus className="w-4 h-4" /></button>
+
+              <form onSubmit={handleNewExpense} className="flex gap-3 mb-4 p-3 bg-slate-900/50 rounded-xl border border-white/5">
+                  <div className="flex-1">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold ml-1 mb-1 block">Description</label>
+                      <input 
+                          type="text" 
+                          placeholder="e.g. Lunch, Supplies, Transport" 
+                          value={expDesc} 
+                          onChange={e=>setExpDesc(e.target.value)} 
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-orange-500 outline-none placeholder:text-slate-600" 
+                      />
+                  </div>
+                  <div className="w-28">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold ml-1 mb-1 block">Amount</label>
+                      <input 
+                          type="number" 
+                          placeholder="0.00" 
+                          value={expAmount} 
+                          onChange={e=>setExpAmount(e.target.value)} 
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-orange-500 outline-none placeholder:text-slate-600 text-right font-mono" 
+                      />
+                  </div>
+                  <div className="flex items-end">
+                      <button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white p-2.5 rounded-lg transition-colors shadow-lg shadow-orange-900/20 h-[42px] w-[42px] flex items-center justify-center">
+                          <Plus className="w-5 h-5" />
+                      </button>
+                  </div>
               </form>
-              <div className="space-y-1">
-                  {expenses.map(exp => (
-                      <div key={exp.id} className="flex justify-between text-xs text-slate-400 bg-slate-900/30 p-2 rounded">
-                          <span>{exp.description}</span>
-                          <div className="flex gap-2">
-                             <span className="text-red-400">-{exp.amount}</span>
-                             <button onClick={() => onDeleteExpense(exp.id)} className="text-slate-600 hover:text-red-500"><Trash2 className="w-3 h-3"/></button>
-                          </div>
+
+              <div className="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-1">
+                  {expenses.length === 0 ? (
+                      <div className="text-center py-6 text-slate-500 text-xs italic border border-dashed border-slate-800 rounded-xl">
+                          No expenses recorded today.
                       </div>
-                  ))}
+                  ) : (
+                      expenses.map(exp => (
+                          <div key={exp.id} className="flex justify-between items-center text-sm text-slate-300 bg-slate-800/40 hover:bg-slate-800/60 p-3 rounded-xl border border-white/5 transition-colors group">
+                              <div className="flex items-center gap-3">
+                                  <div className="w-1 h-8 bg-orange-500/50 rounded-full"></div>
+                                  <div className="flex flex-col">
+                                      <span className="font-medium text-white">{exp.description}</span>
+                                      <span className="text-[10px] text-slate-500">{new Date(exp.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                  </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                 <span className="text-red-400 font-mono font-bold">-{formatCurrency(exp.amount)}</span>
+                                 <button 
+                                    onClick={() => onDeleteExpense(exp.id)} 
+                                    className="text-slate-600 hover:text-red-500 p-1.5 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                    title="Delete Expense"
+                                 >
+                                     <Trash2 className="w-3.5 h-3.5"/>
+                                 </button>
+                              </div>
+                          </div>
+                      ))
+                  )}
               </div>
           </div>
 
