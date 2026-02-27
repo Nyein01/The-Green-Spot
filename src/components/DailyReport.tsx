@@ -4,6 +4,7 @@ import { formatCurrency, generateId } from '../utils/pricing';
 import { saveDayReportToCloud } from '../services/storageService';
 import { Download, TrendingUp, Save, LogOut, Wallet, Plus, Trash2, QrCode, AlertTriangle, RefreshCw, Loader2, Leaf, Calendar, X } from 'lucide-react';
 import { jsPDF } from "jspdf";
+import { CashDrawer } from './CashDrawer';
 
 interface DailyReportProps {
   sales: SaleItem[];
@@ -35,6 +36,14 @@ export const DailyReport: React.FC<DailyReportProps> = ({
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
   const netIncome = totalRevenue - totalExpenses;
   const totalItems = sales.length;
+
+  // Calculate Expected Cash in Drawer
+  // Cash Sales - Expenses
+  const cashSales = sales
+    .filter(s => s.paymentMethod === 'Cash' || !s.paymentMethod)
+    .reduce((sum, s) => sum + s.price, 0);
+    
+  const expectedCash = cashSales - totalExpenses;
   
   const handleSaveAndArchive = async () => {
     setSavingReport(true);
@@ -475,6 +484,9 @@ export const DailyReport: React.FC<DailyReportProps> = ({
                   <p className="text-2xl font-black text-white">{sales.length}</p>
               </div>
           </div>
+
+          {/* Cash Drawer Calculator */}
+          <CashDrawer expectedCash={expectedCash} />
           
           {/* Expenses */}
           <div className="glass-panel p-5 rounded-2xl">
